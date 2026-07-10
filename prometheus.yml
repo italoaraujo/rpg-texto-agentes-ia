@@ -1,0 +1,22 @@
+global:
+  scrape_interval: 15s     # Intervalo padrão de coleta de métricas
+  evaluation_interval: 15s # Intervalo para avaliação de regras de alerta
+
+# Definições de regras de alerta (opcional, pode ser expandido depois)
+rule_files:
+  # - "alert_rules.yml"
+
+# Configurações de coleta de métricas (Scrape Configurations)
+scrape_configs:
+  - job_name: "rpg-backend"
+    metrics_path: "/metrics"
+    scrape_interval: 5s # Intervalo reduzido para termos telemetria quase em tempo real no jogo de RPG
+    static_configs:
+      - targets: ["backend:8000"]
+        labels:
+          environment: "development"
+          application: "rpg-agent-backend"
+
+  # Dicas de Infraestrutura Alternativas:
+  # - Se rodar fora do Docker localmente: targets: ["localhost:8000"]
+  # - Se rodar Prometheus no Docker e backend no host: targets: ["host.docker.internal:8000"]

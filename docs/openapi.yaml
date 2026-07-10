@@ -1,0 +1,279 @@
+openapi: 3.0.3
+info:
+  title: RPG de Texto Baseado em Agentes - API Backend
+  description: >-
+    Especificação de API para o RPG de texto orquestrado por CrewAI utilizando a API do DeepSeek 
+    com fallback automático e telemetria Prometheus. Esta API serve de contrato entre o 
+    Frontend React/TypeScript e o Backend FastAPI/Python.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000
+    description: Servidor de Desenvolvimento Local
+paths:
+  /game/start:
+    post:
+      summary: Inicializa uma nova sessão de jogo de RPG
+      operationId: startGame
+      tags:
+        - Game Session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartGameRequest'
+      responses:
+        '201':
+          description: Jogo iniciado com sucesso. Retorna o estado inicial do jogo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameStateResponse'
+        '400':
+          description: Requisição inválida (parâmetros de entrada incorretos).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Falha interna ao instanciar os agentes da CrewAI ou conectar às APIs de LLM.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /game/turn:
+    post:
+      summary: Processa um turno de ação do jogador
+      operationId: processTurn
+      tags:
+        - Game Loop
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProcessTurnRequest'
+      responses:
+        '200':
+          description: Turno processado com sucesso. Retorna a nova narrativa e estado do jogo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameStateResponse'
+        '400':
+          description: Sessão de jogo inválida ou encerrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Timeout no processamento da LLM (DeepSeek API e fallback indisponíveis).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Erro inesperado no motor do jogo ou orquestrador.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /metrics:
+    get:
+      summary: Retorna as métricas de telemetria no formato Prometheus
+      operationId: getMetrics
+      tags:
+        - Monitoring
+      responses:
+        '200':
+          description: Métricas coletadas com sucesso.
+          content:
+            text/plain; version=0.0.4:
+              schema:
+                type: string
+                example: |
+                  # HELP rpg_player_health Vida atual do jogador de RPG em tempo real
+                  # TYPE rpg_player_health gauge
+                  rpg_player_health{game_id="game-123",player_name="Arthur"} 85.0
+                  # HELP rpg_model_switches_total Contador de alternâncias/fallbacks de modelo de IA
+                  # TYPE rpg_model_switches_total counter
+                  rpg_model_switches_total{reason="timeout"} 1
+                  # HELP rpg_llm_request_duration_seconds Latência de resposta da API de LLM por turno
+                  # TYPE rpg_llm_request_duration_seconds histogram
+                  rpg_llm_request_duration_seconds_bucket{le="1.0",model="deepseek-chat"} 5
+                  rpg_llm_request_duration_seconds_bucket{le="4.0",model="deepseek-chat"} 12
+                  rpg_llm_request_duration_seconds_bucket{le="+Inf",model="deepseek-chat"} 15
+                  rpg_llm_request_duration_seconds_sum{model="deepseek-chat"} 42.5
+                  rpg_llm_request_duration_seconds_count{model="deepseek-chat"} 15
+                  # HELP rpg_llm_tokens_consumed_total Consumo acumulado de Tokens da API de LLM
+                  # TYPE rpg_llm_tokens_consumed_total counter
+                  rpg_llm_tokens_consumed_total{type="prompt",model="deepseek-chat"} 14500
+                  rpg_llm_tokens_consumed_total{type="completion",model="deepseek-chat"} 8200
+
+components:
+  schemas:
+    StartGameRequest:
+      type: object
+      required:
+        - player_name
+        - character_class
+      properties:
+        player_name:
+          type: string
+          example: "Arthur Pendragon"
+          description: Nome do personagem escolhido pelo jogador.
+        character_class:
+          type: string
+          enum: [Guerreiro, Mago, Ladino, Clerigo]
+          example: "Guerreiro"
+          description: Classe do personagem que determina atributos iniciais e interações.
+        llm_config:
+          $ref: '#/components/schemas/LLMConfig'
+
+    LLMConfig:
+      type: object
+      properties:
+        primary_model:
+          type: string
+          default: "deepseek-chat"
+          example: "deepseek-chat"
+          description: O modelo de IA primário da API do DeepSeek.
+        fallback_model:
+          type: string
+          default: "gpt-4o-mini"
+          example: "gpt-4o-mini"
+          description: O modelo utilizado como contingência se o DeepSeek falhar ou exceder o timeout.
+        temperature:
+          type: number
+          minimum: 0.0
+          maximum: 2.0
+          default: 0.7
+          example: 0.7
+          description: Controla a criatividade da resposta gerada pela API do DeepSeek.
+        max_tokens:
+          type: integer
+          minimum: 1
+          default: 1500
+          example: 1000
+          description: Limite de tokens para a resposta da narrativa da CrewAI.
+
+    ProcessTurnRequest:
+      type: object
+      required:
+        - game_id
+        - player_action
+      properties:
+        game_id:
+          type: string
+          format: uuid
+          example: "d3b07384-d113-4c22-9b21-4b13a35a74bb"
+          description: Identificador único da sessão de jogo ativa.
+        player_action:
+          type: string
+          example: "Empunhar minha espada e atacar o Orc à minha frente."
+          description: Ação descritiva em texto plano tomada pelo jogador.
+
+    GameStateResponse:
+      type: object
+      required:
+        - game_id
+        - narrative
+        - player_state
+        - telemetry_metadata
+      properties:
+        game_id:
+          type: string
+          format: uuid
+          example: "d3b07384-d113-4c22-9b21-4b13a35a74bb"
+          description: Identificador da sessão de jogo.
+        narrative:
+          type: string
+          example: "Você desfere um golpe certeiro no Orc. O monstro urra de dor, mas contra-ataca rapidamente arranhando seu braço direito. Um halo misterioso brilha ao redor do altar central."
+          description: Narrativa rica gerada pelos agentes da CrewAI contendo as consequências da ação do jogador.
+        player_state:
+          $ref: '#/components/schemas/PlayerState'
+        telemetry_metadata:
+          $ref: '#/components/schemas/TelemetryMetadata'
+
+    PlayerState:
+      type: object
+      required:
+        - health
+        - max_health
+        - inventory
+        - alive
+      properties:
+        health:
+          type: integer
+          example: 85
+          description: Pontos de vida atuais do jogador (Gauge).
+        max_health:
+          type: integer
+          example: 100
+          description: Pontos de vida máximos possíveis para o jogador.
+        inventory:
+          type: array
+          items:
+            type: string
+          example: ["Espada de Bronze", "Pocao de Cura P", "Escudo de Madeira"]
+          description: Itens atualmente carregados pelo jogador no inventário.
+        alive:
+          type: boolean
+          example: true
+          description: Flag que indica se o jogador ainda está vivo ou se o jogo acabou.
+
+    TelemetryMetadata:
+      type: object
+      required:
+        - active_model
+        - fallback_triggered
+        - response_time_seconds
+        - tokens_consumed
+      properties:
+        active_model:
+          type: string
+          example: "deepseek-chat"
+          description: Identificador do modelo de IA que processou com sucesso este turno.
+        fallback_triggered:
+          type: boolean
+          example: false
+          description: Indica se a requisição sofreu fallback devido a erro ou latência na API do DeepSeek.
+        response_time_seconds:
+          type: number
+          example: 2.45
+          description: Tempo gasto para processar a resposta de IA da Crew neste turno.
+        tokens_consumed:
+          type: object
+          properties:
+            prompt:
+              type: integer
+              example: 1200
+            completion:
+              type: integer
+              example: 350
+            total:
+              type: integer
+              example: 1550
+          description: Contagem exata de tokens utilizados na API da LLM neste turno.
+
+    ErrorResponse:
+      type: object
+      required:
+        - error_code
+        - message
+        - details
+      properties:
+        error_code:
+          type: string
+          example: "TIMEOUT_FALLBACK_FAILED"
+          description: Código interno de erro para tratamento do Frontend.
+        message:
+          type: string
+          example: "O serviço de inteligência artificial falhou e o modelo reserva também não pôde ser contatado."
+          description: Mensagem de erro amigável ao usuário.
+        details:
+          type: string
+          example: "Connection refused on backup API endpoints after 4000ms timeout."
+          description: Detalhes adicionais técnicos (logs/stacktrace filtrado).
