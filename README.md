@@ -119,23 +119,54 @@ O ambiente completo do projeto é conteinerizado e gerenciado através do arquiv
 
 ### Portas Mapeadas do Ambiente
 * **Backend FastAPI**: `http://localhost:8000` (Endpoints `/game/*` e `/metrics`)
-* **Frontend React (Vite)**: `http://localhost:5173`
+* **Frontend React (Vite)**: `http://localhost:5174`
 * **Prometheus**: `http://localhost:9090` (Visualização direta de métricas e targets)
 * **Grafana**: `http://localhost:3001` (Dashboard com credenciais padrão `admin` / `admin`)
 
 ### Como Inicializar o Ambiente
 Para subir todos os contêineres e inicializar a coleta de telemetria, execute o comando:
 ```bash
-docker-compose up --build -d
+docker compose up --build -d
 ```
 
 Para monitorar os logs dos serviços:
 ```bash
-docker-compose logs -f
+docker compose logs -f
 ```
 
 Para desligar o ambiente e limpar os recursos:
 ```bash
-docker-compose down
+docker compose down
 ```
+
+---
+
+## 5. Funcionalidades de Gameplay Avançadas Desenvolvidas
+
+Para oferecer uma experiência de RPG de texto de ponta, implementamos as seguintes mecânicas avançadas:
+
+1. **Seleção de Ambientes e Transições Geográficas Dinâmicas**:
+   * O jogador pode escolher começar a aventura em um dos **9 ambientes** diferentes na tela de criação de personagem (`Masmorra`, `Floresta`, `Cidade`, `Deserto`, `Montanha`, `Pântano`, `Oceano`, `Vulcão`, `Céu`).
+   * A IA da Crew é contextualizada com o ambiente ativo em cada turno. Se a ação descrita pelo jogador indicar um deslocamento lógico (ex: entrar em cavernas arcanas em uma floresta), a IA realiza dinamicamente a transição física do ambiente, atualizando o banner e os efeitos de luz no frontend.
+2. **Alternativas de Ação (Sugestões da IA)**:
+   * Switch opcional na criação do personagem para que o Mestre (Game Master) forneça de 3 a 5 alternativas rápidas de ação clicáveis e contextuais para o próximo turno. O jogador pode optar por clicar em um botão ou ignorá-los e descrever sua ação livremente na caixa de entrada.
+3. **Narrativa Curta e Dinâmica**:
+   * Switch opcional para forçar a CrewAI a gerar respostas e diálogos mais compactos, ágeis e diretos, economizando tempo de leitura e tokens.
+4. **Inventário Agrupado com Quantidades**:
+   * Itens repetidos são mesclados na interface com multiplicadores visuais (ex: `Pocao de Cura P - x3`) para melhor legibilidade. Quando uma poção é consumida em um turno, o backend gerencia a dedução de exatamente uma unidade do item do inventário do jogador.
+5. **Banner de Ambiente Contextual**:
+   * O console de jogo exibe um banner dinâmico correspondente ao ambiente ativo. A borda esquerda e os efeitos de brilho do console adaptam suas cores de acordo com a atmosfera do local (ex: verde para a Floresta, ciano para a Cidade, dourado para o Deserto, vermelho para o Vulcão, etc.).
+
+---
+
+## 6. Importação Automática do Dashboard no Grafana
+
+O repositório inclui um script Python automatizado para importar o painel pronto com todas as métricas customizadas instrumentadas (latência, pizza de fallbacks de LLM, Gauge de vida corporal do jogador e gráfico de consumo de tokens).
+
+Com o ambiente Docker ativo, execute na raiz do projeto:
+```bash
+python3 import_dashboard.py
+```
+
+O script criará a fonte de dados `Prometheus` (conectando ao container correspondente) e importará o painel exibindo o link de acesso direto do dashboard.
 

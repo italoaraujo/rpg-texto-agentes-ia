@@ -1,0 +1,37 @@
+# Ambientes virtuais Python
+.venv/
+venv/
+ENV/
+env/
+
+# Cache Python e compilações
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+
+# Dependências Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Builds e bundles do Frontend
+frontend/dist/
+frontend/build/
+
+# Variáveis de ambiente e segredos (Crítico!)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Sistemas operacionais
+.DS_Store
+Thumbs.db
+
+# Dados locais e persistências de monitoramento
+prometheus_data/
+grafana_data/

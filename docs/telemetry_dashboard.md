@@ -53,9 +53,9 @@ Aqui estão as queries PromQL detalhadas para alimentar cada um dos quatro pain�
 * **Tipo de Visualização**: Gauge (Medidor circular/barra de preenchimento).
 * **Query PromQL**:
   ```promql
-  rpg_player_health{game_id="$game_id"}
+  rpg_player_health
   ```
-  *(Nota: `$game_id` é uma variável dinâmica do Grafana configurada como query para listar os IDs de jogos ativos `query_result(rpg_player_health)`).*
+  *(Nota: Se houver mais de um jogo ativo, o Grafana renderizará múltiplos Gauges na tela identificando cada jogador).*
 * **Configurações visuais recomendadas**:
   * Limites (Thresholds):
     * `0` a `29` -> Vermelho (Vida Crítica)
@@ -136,6 +136,7 @@ Abaixo está o trecho em formato JSON estruturado contendo a definição da estr
         {
           "expr": "sum(increase(rpg_llm_request_duration_seconds_count[24h])) by (model)",
           "legendFormat": "{{model}}",
+          "instant": true,
           "refId": "A"
         }
       ],
@@ -149,7 +150,7 @@ Abaixo está o trecho em formato JSON estruturado contendo a definição da estr
       "options": {
         "pieType": "donut",
         "reduceOptions": {
-          "values": true,
+          "values": false,
           "calcs": ["lastNotNull"]
         }
       }
@@ -161,8 +162,8 @@ Abaixo está o trecho em formato JSON estruturado contendo a definição da estr
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
       "targets": [
         {
-          "expr": "rpg_player_health{game_id=\"$game_id\"}",
-          "legendFormat": "Vida Atual",
+          "expr": "rpg_player_health",
+          "legendFormat": "{{player_name}} (Vida)",
           "refId": "A"
         }
       ],
@@ -191,6 +192,7 @@ Abaixo está o trecho em formato JSON estruturado contendo a definição da estr
         {
           "expr": "sum(increase(rpg_llm_tokens_consumed_total[24h])) by (model, type)",
           "legendFormat": "{{model}} - {{type}}",
+          "instant": true,
           "refId": "A"
         }
       ],
@@ -214,6 +216,7 @@ Abaixo está o trecho em formato JSON estruturado contendo a definição da estr
   "timepicker": {},
   "timezone": "browser",
   "title": "RPG de Texto Baseado em Agentes - Telemetria",
+  "uid": "rpg-agentes-telemetria",
   "version": 1
 }
 ```

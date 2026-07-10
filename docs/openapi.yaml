@@ -129,6 +129,22 @@ components:
           enum: [Guerreiro, Mago, Ladino, Clerigo]
           example: "Guerreiro"
           description: Classe do personagem que determina atributos iniciais e interações.
+        starting_environment:
+          type: string
+          enum: [Masmorra, Floresta, Cidade, Deserto, Montanha, Pantano, Oceano, Vulcao, Ceu]
+          default: "Masmorra"
+          example: "Masmorra"
+          description: O ambiente inicial onde a aventura do herói começará.
+        short_narrative:
+          type: boolean
+          default: false
+          example: false
+          description: Se verdadeiro, instrui a CrewAI a gerar descrições e diálogos mais curtos, rápidos e diretos.
+        suggest_actions:
+          type: boolean
+          default: false
+          example: false
+          description: Se verdadeiro, o narrador irá incluir de 3 a 5 alternativas de ações recomendadas no turno.
         llm_config:
           $ref: '#/components/schemas/LLMConfig'
 
@@ -180,6 +196,7 @@ components:
       required:
         - game_id
         - narrative
+        - current_environment
         - player_state
         - telemetry_metadata
       properties:
@@ -192,6 +209,16 @@ components:
           type: string
           example: "Você desfere um golpe certeiro no Orc. O monstro urra de dor, mas contra-ataca rapidamente arranhando seu braço direito. Um halo misterioso brilha ao redor do altar central."
           description: Narrativa rica gerada pelos agentes da CrewAI contendo as consequências da ação do jogador.
+        current_environment:
+          type: string
+          example: "Masmorra"
+          description: O ambiente geográfico atual onde o herói se encontra na história.
+        suggested_actions:
+          type: array
+          items:
+            type: string
+          example: ["Examinar o altar misterioso", "Atacar o Orc novamente", "Beber uma Pocao de Cura P", "Fugir em direção à entrada"]
+          description: Lista de ações alternativas recomendadas pela LLM caso a opção de sugestão de ações esteja ativa.
         player_state:
           $ref: '#/components/schemas/PlayerState'
         telemetry_metadata:

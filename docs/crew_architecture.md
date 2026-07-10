@@ -56,11 +56,11 @@ O loop de jogo executa um processo sequencial de três tarefas a cada ação sub
 * **Agente Responsável**: Agente Mestre
 * **Entradas (Contexto Injetado)**:
   * Histórico de Turnos Recentes (Últimos 3 turnos para consistência temporal).
-  * Estado Atual do Jogador (Vida atual, Inventário, Localização).
+  * Estado Atual do Jogador (Vida atual, Inventário, Ambiente Geográfico Atual).
   * Ação do Jogador (Input bruto recebido da API).
 * **Descrição da Tarefa**:
-  > Analise a ação do jogador: "{player_action}". Com base no estado atual do jogador (Vida: {health}, Inventário: {inventory}) e na lore do ambiente, determine o resultado da ação.
-  > Se a ação envolver perigo ou combate, calcule o sucesso e as consequências físicas.
+  > Analise a ação do jogador: "{player_action}". Com base no estado atual do jogador (Vida: {health}, Inventário: {inventory}) e no ambiente geográfico ativo ({current_environment}), determine o resultado da ação.
+  > Se a ação envolver perigo ou combate, calcule o sucesso e as consequências físicas baseadas nas regras daquela região.
   > Se o jogador for atingido, calcule o dano (um número inteiro). Se ele usar um item de cura do inventário, remova-o do inventário e determine a cura.
   > Retorne uma descrição factual das consequências no ambiente física e o resumo das alterações de estado (vida perdida/ganha, itens adicionados/removidos).
 * **Estrutura de Saída**: Pydantic Schema (`ActionResolutionModel` contendo a narrativa física, variação de vida e modificações de itens).
@@ -80,20 +80,22 @@ O loop de jogo executa um processo sequencial de três tarefas a cada ação sub
 * **Entradas (Contexto Injetado)**:
   * Saída da Tarefa 1 (Resolução física).
   * Saída da Tarefa 2 (Reação de Eldon).
+  * Opções de controle (`short_narrative` e `suggest_actions`).
+  * Ambiente Geográfico Atual (`current_environment`).
 * **Descrição da Tarefa**:
   > Combine de forma fluida a narrativa física da Tarefa 1 com o diálogo/reação do NPC da Tarefa 2.
   > Crie um texto literário coeso, imersivo e sem repetições que será exibido na tela do jogador.
-  > Além da narrativa literária consolidada, calcule o estado final absoluto do jogador: Nova Vida (garantindo limites entre 0 e 100) e Novo Inventário atualizado.
-* **Estrutura de Saída (JSON Final)**: O orquestrador deve estruturar a resposta para bater exatamente com a especificação da API (`GameStateResponse`):
+  > **Controle de Ambientes**: Avalie se as consequências do turno causaram um deslocamento do personagem do ambiente atual para um dos 9 suportados.
+  > **Sugestões de Ação**: Se a opção estiver ativa, elabore de 3 a 5 alternativas curtas de ação sob a perspectiva do herói para o próximo turno.
+* **Estrutura de Saída (JSON Final)**: O orquestrador estruturará a resposta JSON contendo:
   ```json
   {
     "narrative": "Texto narrativo final unificado...",
-    "player_state": {
-      "health": 85,
-      "max_health": 100,
-      "inventory": ["Espada", "Escudo"],
-      "alive": true
-    }
+    "current_environment": "Floresta",
+    "health_change": -10,
+    "items_added": [],
+    "items_removed": ["Pocao de Cura P"],
+    "suggested_actions": ["Explorar a caverna escura", "Fugir em direção ao rio", "Descansar na clareira"]
   }
   ```
 
@@ -101,7 +103,7 @@ O loop de jogo executa um processo sequencial de três tarefas a cada ação sub
 
 ## 4. Injeção de Contexto e Memória de Curto Prazo
 
-Para garantir que a API do DeepSeek não sofra com alucinações de estado ou perca o fio da história, o Backend FastAPI gerenciará uma **Memória de Turno** persistida em banco de dados ou em cache Redis:
+Para garantir que a API do DeepSeek não sofra com alucinações de estado ou perca o fio da história, o Backend FastAPI gerenciará uma **Memória de Turno** persistida em memória volátil (`games_db`):
 
 ```mermaid
 graph TD
@@ -118,5 +120,5 @@ graph TD
     AssembleState --> ReturnFrontend[Retorna GameStateResponse]
 ```
 
-* **Estrutura de Memória**: O prompt do sistema (System Message) e o histórico de até 3 mensagens anteriores de turno serão concatenados como `Context` nas tarefas do CrewAI.
-* **Consistência de Estado**: O estado do jogador (vida, inventário) é o contrato mestre. Se a LLM alucinar que o jogador ganhou um item que não foi processado fisicamente na Tarefa 1, a lógica do backend FastAPI atua como validadora ("guardrail") antes de persistir e responder ao Frontend.
+* **Estrutura de Memória**: O histórico de turnos anteriores e o estado absoluto do jogador são injetados nas tarefas do CrewAI.
+* **Consistência de Estado**: O estado do jogador (vida, inventário, ambiente) é o contrato mestre. Se a LLM tentar adicionar itens ou alterar a vida de forma desconectada das mecânicas, o parser do backend valida e ajusta os valores (como deduzir corretamente uma unidade do item no inventário) antes de responder ao Frontend.
