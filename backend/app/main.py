@@ -36,12 +36,23 @@ def get_initial_inventory(character_class: str) -> list:
     }
     return inventories.get(character_class, ["Graveto", "Pocao de Cura P", "Pocao de Cura P", "Pocao de Cura P"])
 
+def get_initial_skills(character_class: str) -> list:
+    """Retorna habilidades iniciais baseadas na classe do personagem."""
+    skills = {
+        "Guerreiro": ["Golpe Poderoso", "Bloqueio com Escudo"],
+        "Mago": ["Bola de Fogo", "Missil Magico"],
+        "Ladino": ["Ataque Furtivo", "Furtividade"],
+        "Clerigo": ["Cura Divina", "Escudo da Fe"]
+    }
+    return skills.get(character_class, ["Ataque Basico"])
+
 @app.post("/game/start", response_model=GameStateResponse, status_code=201)
 def start_game(request: StartGameRequest):
     game_id = uuid.uuid4()
     
     # Define o estado inicial do jogador
     initial_inventory = get_initial_inventory(request.character_class)
+    initial_skills = get_initial_skills(request.character_class)
     
     # Para o turno de introdução, orquestramos a Crew interpretando a ação inicial do jogador
     intro_action = f"Explorar a região de {request.starting_environment} e observar o ambiente ao redor."
@@ -59,6 +70,7 @@ def start_game(request: StartGameRequest):
             current_health=100,
             current_inventory=initial_inventory,
             current_companions=initial_companions,
+            current_skills=initial_skills,
             short_narrative=request.short_narrative,
             suggest_actions=request.suggest_actions,
             current_environment=request.starting_environment
@@ -75,6 +87,7 @@ def start_game(request: StartGameRequest):
             "health": player_state["health"],
             "inventory": player_state["inventory"],
             "companions": player_state["companions"],
+            "skills": player_state["skills"],
             "alive": player_state["alive"]
         }
         rpg_active_sessions_count.set(len(games_db))
@@ -118,6 +131,7 @@ def process_turn(request: ProcessTurnRequest):
             current_health=game_state["health"],
             current_inventory=game_state["inventory"],
             current_companions=game_state.get("companions", ["Eldon"]),
+            current_skills=game_state.get("skills", []),
             short_narrative=game_state["short_narrative"],
             suggest_actions=game_state.get("suggest_actions", False),
             current_environment=game_state.get("current_environment", "Masmorra")
@@ -128,6 +142,7 @@ def process_turn(request: ProcessTurnRequest):
             "health": player_state["health"],
             "inventory": player_state["inventory"],
             "companions": player_state["companions"],
+            "skills": player_state["skills"],
             "current_environment": current_env,
             "alive": player_state["alive"]
         })

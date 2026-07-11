@@ -21,6 +21,7 @@ interface PlayerState {
   max_health: number;
   inventory: string[];
   companions: string[];
+  skills: string[];
   alive: boolean;
 }
 
@@ -88,6 +89,7 @@ export default function App() {
       max_health: 100,
       inventory: [],
       companions: [],
+      skills: [],
       alive: true
     };
   });
@@ -808,6 +810,57 @@ export default function App() {
                 ) : (
                   <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic', padding: '10px 14px', border: '1px dashed var(--border-color)', borderRadius: '10px', textAlign: 'center' }}>
                     Nenhum companheiro no grupo.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Habilidades do Herói */}
+            <div style={{ marginBottom: '20px' }}>
+              <div className="health-header" style={{ marginBottom: '12px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  <Sparkles size={16} style={{ color: 'var(--accent-gold)' }} />
+                  Habilidades do Herói
+                </span>
+              </div>
+              <div className="skills-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {playerState.skills && playerState.skills.length > 0 ? (
+                  playerState.skills.map((skill: string, idx: number) => (
+                    <div 
+                      key={idx} 
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '10px',
+                        padding: '10px 14px',
+                        fontSize: '0.88rem',
+                        transition: 'var(--transition-smooth)',
+                        cursor: 'default'
+                      }}
+                      onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                        e.currentTarget.style.borderColor = 'var(--accent-gold)';
+                        e.currentTarget.style.boxShadow = '0 0 10px rgba(245, 158, 11, 0.12)';
+                      }}
+                      onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
+                        e.currentTarget.style.borderColor = 'var(--border-color)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '1.1rem', color: 'var(--accent-gold)' }}>⚡</span>
+                        <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{skill}</span>
+                      </div>
+                      <span style={{ fontSize: '0.72rem', background: 'rgba(245, 158, 11, 0.15)', color: 'var(--accent-gold)', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>Ativa</span>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic', padding: '10px 14px', border: '1px dashed var(--border-color)', borderRadius: '10px', textAlign: 'center' }}>
+                    Nenhuma habilidade aprendida.
                   </div>
                 )}
               </div>

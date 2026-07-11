@@ -26,6 +26,7 @@ class PlayerState(BaseModel):
     max_health: int = Field(default=100, example=100)
     inventory: List[str] = Field(default_factory=list, example=["Espada de Bronze", "Pocao de Cura P"])
     companions: List[str] = Field(default_factory=list, example=["Eldon"])
+    skills: List[str] = Field(default_factory=list, example=["Golpe Poderoso"])
     alive: bool = Field(default=True)
 
 class TokenUsage(BaseModel):
