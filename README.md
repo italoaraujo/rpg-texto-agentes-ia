@@ -92,15 +92,15 @@ rpg-agentes/
 
 Os seguintes artefatos já estão disponíveis no diretório `./docs` e na raiz para consulta e orientação do desenvolvimento:
 
-1. **[openapi.yaml](file:///var/www/rpg/docs/openapi.yaml)**:
+1. **[openapi.yaml](file:///opt/aula/rpg-texto-agentes-ia/docs/openapi.yaml)**:
    Contrato estrito de rotas. Define esquemas robustos para `/game/start`, `/game/turn` e o formato raw de `/metrics` para que o Frontend React e o Backend FastAPI tenham alinhamento total de tipos desde o início.
-2. **[behavior.feature](file:///var/www/rpg/docs/behavior.feature)**:
+2. **[behavior.feature](file:///opt/aula/rpg-texto-agentes-ia/docs/behavior.feature)**:
    Especificação de cenários de teste de comportamento cobrindo turnos felizes, variação de pontos de vida por danos e uso de poções, e o fluxo crítico de resiliência e fallback caso o DeepSeek falhe ou demore mais de 4 segundos.
-3. **[crew_architecture.md](file:///var/www/rpg/docs/crew_architecture.md)**:
+3. **[crew_architecture.md](file:///opt/aula/rpg-texto-agentes-ia/docs/crew_architecture.md)**:
    Explicação textual de como a CrewAI será estruturada, incluindo o perfil dos dois agentes principais (Mestre e NPC), as três tarefas executadas em série (Arbitragem, Diálogo, Consolidação) e como a memória de turnos recentes é injetada nas requisições da LLM.
-4. **[telemetry_dashboard.md](file:///var/www/rpg/docs/telemetry_dashboard.md)**:
+4. **[telemetry_dashboard.md](file:///opt/aula/rpg-texto-agentes-ia/docs/telemetry_dashboard.md)**:
    Mapeamento PromQL completo e arquivo JSON do painel Grafana contendo as visualizações de latência do DeepSeek, pizza de distribuição por modelo (DeepSeek vs Fallback), Gauge de saúde do jogador ativo e gráfico de barras empilhadas para consumo de tokens.
-5. **[prometheus.yml](file:///var/www/rpg/prometheus.yml)**:
+5. **[prometheus.yml](file:///opt/aula/rpg-texto-agentes-ia/prometheus.yml)**:
    Arquivo pronto para inicializar o Prometheus raspando o backend local na porta `8000` a cada 5 segundos para telemetria de alta frequência do jogo.
 
 ---

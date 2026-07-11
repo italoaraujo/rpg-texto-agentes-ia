@@ -10,75 +10,89 @@ O backend FastAPI irá expor no endpoint `/metrics` as seguintes métricas nativ
 
 | Nome da Métrica | Tipo | Labels | Descrição |
 | :--- | :--- | :--- | :--- |
-| `rpg_player_health` | **Gauge** | `game_id`, `player_name`, `class` | Nível atual de pontos de vida do jogador. |
+| `rpg_player_health` | **Gauge** | `game_id`, `player_name`, `character_class` | Nível atual de pontos de vida do jogador. |
 | `rpg_model_switches_total` | **Counter** | `reason`, `fallback_model` | Total de vezes que a aplicação alternou de modelo de IA (fallback). |
 | `rpg_llm_request_duration_seconds` | **Histogram** | `model`, `status` | Tempo de resposta (latência) da chamada de IA da Crew. |
 | `rpg_llm_tokens_consumed_total` | **Counter** | `model`, `type` (`prompt` ou `completion`) | Contagem total de tokens consumidos no processamento. |
+| `rpg_crew_task_duration_seconds` | **Histogram** | `task_name` | Duração de execução de cada tarefa individual na CrewAI (arbitration, npc_reaction, consolidation). |
+| `rpg_active_environment_turns_total` | **Counter** | `biome` | Contador de turnos passados em cada ambiente. |
+| `rpg_game_turns_total` | **Counter** | `game_id` | Contador total de turnos processados por sessão. |
+| `rpg_active_sessions_count` | **Gauge** | nenhuma | Quantidade de sessões de jogos ativas simultaneamente. |
+| `rpg_player_items_consumed_total` | **Counter** | `item_name` | Contador de itens do inventário consumidos ou removidos. |
 
 ---
 
 ## 2. Especificação das Consultas (PromQL)
 
-Aqui estão as queries PromQL detalhadas para alimentar cada um dos quatro painéis solicitados no dashboard do Grafana:
+Aqui estão as queries PromQL detalhadas para alimentar cada um dos painéis no dashboard do Grafana:
 
-### A. Painel 1: Latência de Resposta por Turno (Gráfico de Linha)
-* **Objetivo**: Monitorar a latência da API do DeepSeek em tempo real, visualizando picos e desvios, incluindo o comportamento após o acionamento de fallbacks.
-* **Tipo de Visualização**: Gráfico de Linha (Time Series).
-* **Queries PromQL**:
-  * **Percentil 95 da latência (p95)**:
-    ```promql
-    histogram_quantile(0.95, sum(rate(rpg_llm_request_duration_seconds_bucket[5m])) by (le, model))
-    ```
-  * **Latência Média da IA**:
-    ```promql
-    sum(rate(rpg_llm_request_duration_seconds_sum[5m])) by (model) / sum(rate(rpg_llm_request_duration_seconds_count[5m])) by (model)
-    ```
-* **Configurações visuais recomendadas**:
-  * Unidade: Segundos (`s`).
-  * Mapeamento de cor: Vermelho para latências acima de `4.0s` (limite crítico de timeout do DeepSeek).
+### A. Latência de Resposta por Turno (Gráfico de Linha)
+* **Percentil 95 da latência (p95)**:
+  ```promql
+  histogram_quantile(0.95, sum(rate(rpg_llm_request_duration_seconds_bucket[5m])) by (le, model))
+  ```
+* **Latência Média da IA**:
+  ```promql
+  sum(rate(rpg_llm_request_duration_seconds_sum[5m])) by (model) / sum(rate(rpg_llm_request_duration_seconds_count[5m])) by (model)
+  ```
 
-### B. Painel 2: Distribuição de Requisições por Modelo (Gráfico de Pizza/Donut)
-* **Objetivo**: Visualizar a proporção de requisições que estão rodando na LLM Primária (DeepSeek) versus o modelo reserva (Fallback), evidenciando a taxa de sucesso da infraestrutura primária.
-* **Tipo de Visualização**: Gráfico de Pizza ou Donut (Pie Chart).
-* **Query PromQL**:
+### B. Distribuição de Requisições por Modelo (Gráfico de Pizza/Donut)
+* Query PromQL:
   ```promql
   sum(increase(rpg_llm_request_duration_seconds_count[24h])) by (model)
   ```
-* **Configurações visuais recomendadas**:
-  * Exibir valores absolutos e porcentagens na legenda.
-  * Mapeamento de cor estável: `deepseek-chat` = Azul Marinho; `gpt-4o-mini` = Verde/Laranja.
 
-### C. Painel 3: Vida Atual do Jogador em Tempo Real (Gauge Visual)
-* **Objetivo**: Renderizar o medidor de saúde física do personagem selecionado na tela de telemetria.
-* **Tipo de Visualização**: Gauge (Medidor circular/barra de preenchimento).
-* **Query PromQL**:
+### C. Vida Atual do Jogador em Tempo Real (Gauge Visual)
+* Query PromQL:
   ```promql
   rpg_player_health
   ```
-  *(Nota: Se houver mais de um jogo ativo, o Grafana renderizará múltiplos Gauges na tela identificando cada jogador).*
-* **Configurações visuais recomendadas**:
-  * Limites (Thresholds):
-    * `0` a `29` -> Vermelho (Vida Crítica)
-    * `30` a `69` -> Amarelo (Cuidado)
-    * `70` a `100` -> Verde (Saudável)
-  * Valor Máximo: `100`
 
-### D. Painel 4: Consumo Acumulado de Tokens (Gráfico de Barras)
-* **Objetivo**: Demonstrar de forma empilhada o volume de tokens enviados (prompt) e recebidos (completion), faturados pela API do DeepSeek e do modelo reserva.
-* **Tipo de Visualização**: Gráfico de Barras Empilhado (Bar Chart / Bar Gauge).
-* **Query PromQL**:
+### D. Consumo Acumulado de Tokens (Gráfico de Barras Empilhado)
+* Query PromQL:
   ```promql
   sum(increase(rpg_llm_tokens_consumed_total[24h])) by (model, type)
   ```
-* **Configurações visuais recomendadas**:
-  * Exibição empilhada por tipo (`prompt` na base da barra e `completion` no topo).
-  * Unidade: Tokens (Short format).
+
+### E. Custo Estimado da API (LLM Cost) (Painel Stat)
+* Query PromQL:
+  ```promql
+  (sum(increase(rpg_llm_tokens_consumed_total{model="deepseek-chat", type="prompt"}[24h])) * 0.00000014) + (sum(increase(rpg_llm_tokens_consumed_total{model="deepseek-chat", type="completion"}[24h])) * 0.00000028) + (sum(increase(rpg_llm_tokens_consumed_total{model="gpt-4o-mini", type="prompt"}[24h])) * 0.00000015) + (sum(increase(rpg_llm_tokens_consumed_total{model="gpt-4o-mini", type="completion"}[24h])) * 0.00000060)
+  ```
+
+### F. Duração Média das Tarefas da Crew (Gráfico de Linha / Time Series)
+* Query PromQL:
+  ```promql
+  sum(rate(rpg_crew_task_duration_seconds_sum[5m])) by (task_name) / sum(rate(rpg_crew_task_duration_seconds_count[5m])) by (task_name)
+  ```
+
+### G. Ambientes/Biomas Mais Visitados (Gráfico de Rosca / Donut)
+* Query PromQL:
+  ```promql
+  sum(increase(rpg_active_environment_turns_total[24h])) by (biome)
+  ```
+
+### H. Ritmo de Jogo: TPM & Sessões Ativas (Gráfico de Linha / Time Series)
+* **Turnos por Minuto (TPM)**:
+  ```promql
+  sum(rate(rpg_game_turns_total[5m])) * 60
+  ```
+* **Sessões Ativas**:
+  ```promql
+  rpg_active_sessions_count
+  ```
+
+### I. Itens Consumidos/Removidos do Inventário (Gráfico de Barras)
+* Query PromQL:
+  ```promql
+  sum(rpg_player_items_consumed_total) by (item_name)
+  ```
 
 ---
 
 ## 3. Modelo JSON Estruturado de Painéis (Grafana Schema)
 
-Abaixo está o trecho em formato JSON estruturado contendo a definição da estrutura dos painéis do Grafana compatível com a API do Grafana v9.x/v10.x. Este JSON pode ser injetado diretamente na propriedade `panels` do dashboard.
+Abaixo está o arquivo JSON completo estruturado com os 9 painéis integrados e organizados por grid.
 
 ```json
 {
@@ -159,7 +173,7 @@ Abaixo está o trecho em formato JSON estruturado contendo a definição da estr
       "id": 3,
       "title": "Vida Atual do Jogador em Tempo Real",
       "type": "gauge",
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 8 },
       "targets": [
         {
           "expr": "rpg_player_health",
@@ -184,10 +198,35 @@ Abaixo está o trecho em formato JSON estruturado contendo a definição da estr
       }
     },
     {
+      "id": 5,
+      "title": "Custo Estimado da API (LLM Cost - 24h)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 8 },
+      "targets": [
+        {
+          "expr": "(sum(increase(rpg_llm_tokens_consumed_total{model=\"deepseek-chat\", type=\"prompt\"}[24h])) * 0.00000014) + (sum(increase(rpg_llm_tokens_consumed_total{model=\"deepseek-chat\", type=\"completion\"}[24h])) * 0.00000028) + (sum(increase(rpg_llm_tokens_consumed_total{model=\"gpt-4o-mini\", type=\"prompt\"}[24h])) * 0.00000015) + (sum(increase(rpg_llm_tokens_consumed_total{model=\"gpt-4o-mini\", type=\"completion\"}[24h])) * 0.00000060)",
+          "legendFormat": "Custo total",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "color": { "mode": "fixed", "fixedColor": "green" }
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "valueAndName"
+      }
+    },
+    {
       "id": 4,
       "title": "Consumo Acumulado de Tokens (24h)",
       "type": "barchart",
-      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 8 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "targets": [
         {
           "expr": "sum(increase(rpg_llm_tokens_consumed_total[24h])) by (model, type)",
@@ -202,6 +241,94 @@ Abaixo está o trecho em formato JSON estruturado contendo a definição da estr
           "custom": {
             "stacking": { "mode": "normal", "group": "model" }
           }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Duração Média das Tarefas da Crew",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(rate(rpg_crew_task_duration_seconds_sum[5m])) by (task_name) / sum(rate(rpg_crew_task_duration_seconds_count[5m])) by (task_name)",
+          "legendFormat": "{{task_name}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth"
+          },
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Ambientes/Biomas Mais Visitados (Turnos)",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(increase(rpg_active_environment_turns_total[24h])) by (biome)",
+          "legendFormat": "{{biome}}",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "pieType": "donut",
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"]
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Ritmo de Jogo: TPM & Sessões Ativas",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "sum(rate(rpg_game_turns_total[5m])) * 60",
+          "legendFormat": "Turnos por Minuto (TPM)",
+          "refId": "A"
+        },
+        {
+          "expr": "rpg_active_sessions_count",
+          "legendFormat": "Sessões Simultâneas Ativas",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line"
+          },
+          "unit": "none"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Itens Consumidos/Removidos do Inventário",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "expr": "sum(rpg_player_items_consumed_total) by (item_name)",
+          "legendFormat": "{{item_name}}",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
         }
       }
     }

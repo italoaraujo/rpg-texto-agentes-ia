@@ -10,7 +10,7 @@ class ActionResolution(BaseModel):
     items_added: List[str] = Field(default_factory=list, description="Itens adicionados ao inventário.")
     items_removed: List[str] = Field(default_factory=list, description="Itens consumidos ou removidos do inventário.")
 
-def create_arbitration_task(agent: Agent, player_action: str, health: int, inventory: List[str], class_name: str, short_narrative: bool = False, current_environment: str = "Masmorra") -> Task:
+def create_arbitration_task(agent: Agent, player_action: str, health: int, inventory: List[str], class_name: str, short_narrative: bool = False, current_environment: str = "Masmorra", callback=None) -> Task:
     style_instruction = ""
     if short_narrative:
         style_instruction = "\nATENÇÃO: Escreva um resultado físico curto, rápido e direto ao ponto em apenas 1 parágrafo conciso."
@@ -31,10 +31,11 @@ def create_arbitration_task(agent: Agent, player_action: str, health: int, inven
             f"{style_instruction}"
         ),
         expected_output="Uma análise contendo a narrativa dos fatos físicos ocorridos no turno, acompanhada das variações numéricas de vida e inventário.",
-        agent=agent
+        agent=agent,
+        callback=callback
     )
 
-def create_npc_reaction_task(agent: Agent, arbitration_task: Task, short_narrative: bool = False) -> Task:
+def create_npc_reaction_task(agent: Agent, arbitration_task: Task, short_narrative: bool = False, callback=None) -> Task:
     style_instruction = ""
     if short_narrative:
         style_instruction = "\nATENÇÃO: Mantenha a fala ou reação do NPC extremamente curta (máximo de 1 a 2 frases dinâmicas)."
@@ -49,10 +50,11 @@ def create_npc_reaction_task(agent: Agent, arbitration_task: Task, short_narrati
         ),
         expected_output="Uma fala ou reação corporal curta do NPC Eldon reagindo aos acontecimentos físicos.",
         context=[arbitration_task],
-        agent=agent
+        agent=agent,
+        callback=callback
     )
 
-def create_consolidation_task(agent: Agent, arbitration_task: Task, npc_reaction_task: Task, short_narrative: bool = False, suggest_actions: bool = False, current_environment: str = "Masmorra") -> Task:
+def create_consolidation_task(agent: Agent, arbitration_task: Task, npc_reaction_task: Task, short_narrative: bool = False, suggest_actions: bool = False, current_environment: str = "Masmorra", callback=None) -> Task:
     style_instruction = ""
     if short_narrative:
         style_instruction = "\nATENÇÃO: Consolide em uma narrativa muito curta, limpa, objetiva e dinâmica de no máximo 1 ou 2 parágrafos pequenos."
@@ -95,5 +97,6 @@ def create_consolidation_task(agent: Agent, arbitration_task: Task, npc_reaction
         ),
         expected_output="Um bloco JSON contendo as chaves 'narrative', 'current_environment', 'health_change', 'items_added', 'items_removed' e 'suggested_actions'.",
         context=[arbitration_task, npc_reaction_task],
-        agent=agent
+        agent=agent,
+        callback=callback
     )

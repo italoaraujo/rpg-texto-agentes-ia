@@ -71,8 +71,11 @@ def main():
             print(f"Erro ao criar fonte de dados Prometheus (Status {status}): {res}")
 
     # 2. Extrai o JSON do dashboard do arquivo md
+    import os
     try:
-        with open("/var/www/rpg/docs/telemetry_dashboard.md", "r", encoding="utf-8") as f:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        md_path = os.path.join(script_dir, "docs", "telemetry_dashboard.md")
+        with open(md_path, "r", encoding="utf-8") as f:
             content = f.read()
         
         # Encontra o bloco json

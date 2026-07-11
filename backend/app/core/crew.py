@@ -17,7 +17,11 @@ from app.core.telemetry import (
     rpg_player_health,
     rpg_model_switches_total,
     rpg_llm_request_duration_seconds,
-    rpg_llm_tokens_consumed_total
+    rpg_llm_tokens_consumed_total,
+    rpg_crew_task_duration_seconds,
+    rpg_active_environment_turns_total,
+    rpg_game_turns_total,
+    rpg_player_items_consumed_total
 )
 
 def clean_json_output(output_str: str) -> Dict[str, Any]:
@@ -45,6 +49,15 @@ def clean_json_output(output_str: str) -> Dict[str, Any]:
             "current_environment": "Masmorra"
         }
 
+def normalize_item_name(name: str) -> str:
+    import unicodedata
+    name = str(name).lower().strip()
+    name = "".join(
+        c for c in unicodedata.normalize("NFD", name)
+        if unicodedata.category(c) != "Mn"
+    )
+    return name
+
 def run_game_turn(
     game_id: UUID,
     player_name: str,
@@ -68,6 +81,30 @@ def run_game_turn(
     crew_output = ""
 
     start_time = time.time()
+    crew_start_time = start_time
+    t1_end = None
+    t2_end = None
+
+    def t1_callback(output):
+        nonlocal t1_end
+        t1_end = time.time()
+        dur = t1_end - crew_start_time
+        rpg_crew_task_duration_seconds.labels(task_name="arbitration").observe(dur)
+
+    def t2_callback(output):
+        nonlocal t1_end, t2_end
+        t2_end = time.time()
+        start = t1_end if t1_end else crew_start_time
+        dur = t2_end - start
+        rpg_crew_task_duration_seconds.labels(task_name="npc_reaction").observe(dur)
+
+    def t3_callback(output):
+        nonlocal t2_end
+        t3_end = time.time()
+        start = t2_end if t2_end else crew_start_time
+        dur = t3_end - start
+        rpg_crew_task_duration_seconds.labels(task_name="consolidation").observe(dur)
+
     try:
         print(f"[INFO] Iniciando turno do jogo {game_id} usando {active_model} (narrativa_curta={short_narrative}, sugerir_acoes={suggest_actions}, ambiente={current_environment})...")
         # 1. Instancia LLM Primária (DeepSeek) com timeout estrito de 4s
@@ -82,9 +119,9 @@ def run_game_turn(
         gm_agent = create_game_master_agent(llm)
         npc_agent = create_npc_agent(llm)
         
-        t1 = create_arbitration_task(gm_agent, player_action, current_health, current_inventory, character_class, short_narrative, current_environment)
-        t2 = create_npc_reaction_task(npc_agent, t1, short_narrative)
-        t3 = create_consolidation_task(gm_agent, t1, t2, short_narrative, suggest_actions, current_environment)
+        t1 = create_arbitration_task(gm_agent, player_action, current_health, current_inventory, character_class, short_narrative, current_environment, callback=t1_callback)
+        t2 = create_npc_reaction_task(npc_agent, t1, short_narrative, callback=t2_callback)
+        t3 = create_consolidation_task(gm_agent, t1, t2, short_narrative, suggest_actions, current_environment, callback=t3_callback)
         
         crew = Crew(
             agents=[gm_agent, npc_agent],
@@ -130,6 +167,9 @@ def run_game_turn(
         print(f"[INFO] Acionando modelo reserva {active_model}...")
         
         fallback_start_time = time.time()
+        crew_start_time = fallback_start_time
+        t1_end = None
+        t2_end = None
         try:
             # Instancia LLM de fallback com timeout maior
             max_tokens_fallback = 500 if short_narrative else 1500
@@ -142,9 +182,9 @@ def run_game_turn(
             gm_agent = create_game_master_agent(llm_fallback)
             npc_agent = create_npc_agent(llm_fallback)
             
-            t1 = create_arbitration_task(gm_agent, player_action, current_health, current_inventory, character_class, short_narrative, current_environment)
-            t2 = create_npc_reaction_task(npc_agent, t1, short_narrative)
-            t3 = create_consolidation_task(gm_agent, t1, t2, short_narrative, suggest_actions, current_environment)
+            t1 = create_arbitration_task(gm_agent, player_action, current_health, current_inventory, character_class, short_narrative, current_environment, callback=t1_callback)
+            t2 = create_npc_reaction_task(npc_agent, t1, short_narrative, callback=t2_callback)
+            t3 = create_consolidation_task(gm_agent, t1, t2, short_narrative, suggest_actions, current_environment, callback=t3_callback)
             
             crew_fallback = Crew(
                 agents=[gm_agent, npc_agent],
@@ -205,8 +245,28 @@ def run_game_turn(
             updated_inventory.append(it)
             
     for it in resolved_data.get("items_removed", []):
-        if it in updated_inventory:
-            updated_inventory.remove(it)
+        norm_it = normalize_item_name(it)
+        match_item = None
+        
+        # 1. Tenta correspondência exata normalizada (sem acentos, caixa baixa)
+        for inv_item in updated_inventory:
+            if normalize_item_name(inv_item) == norm_it:
+                match_item = inv_item
+                break
+                
+        # 2. Se não encontrou, tenta correspondência parcial (ex: "pocao de cura" contido em "pocao de cura p")
+        if not match_item:
+            for inv_item in updated_inventory:
+                norm_inv_item = normalize_item_name(inv_item)
+                if norm_it in norm_inv_item or norm_inv_item in norm_it:
+                    match_item = inv_item
+                    break
+                    
+        if match_item:
+            updated_inventory.remove(match_item)
+            rpg_player_items_consumed_total.labels(item_name=match_item).inc()
+        else:
+            print(f"[WARNING] Item '{it}' solicitado para remoção não foi encontrado no inventário: {updated_inventory}")
  
     # 7. Atualiza o Gauge de vida no Prometheus
     rpg_player_health.labels(
@@ -214,6 +274,10 @@ def run_game_turn(
         player_name=player_name,
         character_class=character_class
     ).set(new_health)
+
+    # 8. Incrementa o contador de turnos e turnos por ambiente
+    rpg_game_turns_total.labels(game_id=str(game_id)).inc()
+    rpg_active_environment_turns_total.labels(biome=updated_env).inc()
  
     player_state = {
         "health": new_health,

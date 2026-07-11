@@ -36,6 +36,46 @@ rpg_llm_tokens_consumed_total = Counter(
     registry=REGISTRY
 )
 
+# 5. Histogram para Duração das Tarefas da Crew
+rpg_crew_task_duration_seconds = Histogram(
+    "rpg_crew_task_duration_seconds",
+    "Duração de execução de cada tarefa individual na CrewAI",
+    labelnames=["task_name"],
+    buckets=(0.1, 0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0, float("inf")),
+    registry=REGISTRY
+)
+
+# 6. Counter para Ambientes/Biomas Visitados
+rpg_active_environment_turns_total = Counter(
+    "rpg_active_environment_turns_total",
+    "Contador de turnos passados em cada ambiente",
+    labelnames=["biome"],
+    registry=REGISTRY
+)
+
+# 7. Counter para Turnos do Jogo
+rpg_game_turns_total = Counter(
+    "rpg_game_turns_total",
+    "Contador total de turnos processados por sessão",
+    labelnames=["game_id"],
+    registry=REGISTRY
+)
+
+# 8. Gauge para Quantidade de Jogos Simultâneos Ativos
+rpg_active_sessions_count = Gauge(
+    "rpg_active_sessions_count",
+    "Quantidade de sessões de jogos ativas simultaneamente",
+    registry=REGISTRY
+)
+
+# 9. Counter para Itens Consumidos/Removidos
+rpg_player_items_consumed_total = Counter(
+    "rpg_player_items_consumed_total",
+    "Contador de itens do inventário consumidos ou removidos",
+    labelnames=["item_name"],
+    registry=REGISTRY
+)
+
 def get_serialized_metrics() -> bytes:
     """Retorna todas as métricas no formato do Prometheus."""
     return generate_latest(REGISTRY)

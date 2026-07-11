@@ -6,7 +6,7 @@ from uuid import UUID
 
 from app.schemas.game import StartGameRequest, ProcessTurnRequest, GameStateResponse
 from app.core.crew import run_game_turn
-from app.core.telemetry import get_serialized_metrics
+from app.core.telemetry import get_serialized_metrics, rpg_active_sessions_count
 
 app = FastAPI(
     title="RPG de Texto Baseado em Agentes - API",
@@ -24,6 +24,7 @@ app.add_middleware(
 
 # Banco de dados em memória simples para as sessões de jogo ativas
 games_db: Dict[UUID, Dict[str, Any]] = {}
+rpg_active_sessions_count.set(0)
 
 def get_initial_inventory(character_class: str) -> list:
     """Retorna itens iniciais baseados na classe do personagem."""
@@ -70,6 +71,7 @@ def start_game(request: StartGameRequest):
             "inventory": player_state["inventory"],
             "alive": player_state["alive"]
         }
+        rpg_active_sessions_count.set(len(games_db))
         
         return GameStateResponse(
             game_id=game_id,
