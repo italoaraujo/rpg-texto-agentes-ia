@@ -423,8 +423,8 @@ export default function App() {
                   <span style={{ fontSize: '0.7rem', color: setupStep >= stepNum ? 'var(--text-main)' : 'var(--text-muted)', marginTop: '6px', fontWeight: setupStep === stepNum ? 600 : 400 }}>
                     {stepNum === 1 ? 'Nome' :
                      stepNum === 2 ? 'Classe' :
-                     stepNum === 3 ? 'Companheiro' :
-                     stepNum === 4 ? 'Ambiente' : 'Configurações'}
+                     stepNum === 3 ? 'NPC' :
+                     stepNum === 4 ? 'Início' : 'Configs'}
                   </span>
                 </div>
               ))}
