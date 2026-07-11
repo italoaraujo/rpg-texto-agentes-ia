@@ -38,12 +38,14 @@ A Crew de agentes é composta por dois agentes principais que colaboram de manei
   > Você gerencia o estado oculto das masmorras, armadilhas e inimigos. Quando o jogador toma uma ação, você deve determinar se ele obteve sucesso ou falhou (simulando testes de atributos por baixo dos panos) e calcular quaisquer consequências físicas diretas, como dano sofrido, poções consumidas ou novos itens adquiridos. Você se comunica estritamente através do cálculo de mecânicas e descrição de fatos.
 * **LLM Ativa**: Vinculada à LLM Primária (DeepSeek) com chave de fallback ativo.
 
-### B. Agente NPC (World Companion)
-* **Role**: `Companheiro de Viagem e Habitante Local`
-* **Goal**: `Reagir emocionalmente e dialogicamente aos eventos do turno e escolhas do jogador, adicionando profundidade dramática, diálogos elore regional à narrativa final.`
-* **Backstory**:
-  > Você é Eldon, um guia e arqueólogo local que acompanha o jogador na exploração da masmorra antiga. Você possui um temperamento cauteloso, medo de criaturas das trevas e um vasto conhecimento sobre a história e símbolos das ruínas.
-  > Suas falas e reações são espontâneas e devem refletir o que acabou de acontecer no turno. Você nunca decide o resultado das ações físicas do jogador (isso é dever do Mestre), mas você reage verbalmente e pode oferecer conselhos, expressar pavor ou comemorar sucessos ao lado do jogador, mantendo uma personalidade rica e coerente.
+### B. Agente NPC (World Companion - Dinâmico)
+* **Role**: Resolvido dinamicamente com base no companheiro ativo (`Eldon`, `Grom`, `Lyra` ou nenhum).
+* **Goal**: Reagir emocionalmente e dialogicamente aos eventos do turno de acordo com a personalidade do companheiro ativo.
+* **Backstories Suportados**:
+  * **Eldon (Arqueólogo Cauteloso)**: Possui temperamento medroso em relação à escuridão e monstros, mas detém vasto conhecimento de ruínas antigas e lore regional.
+  * **Grom (Guerreiro Impulsivo)**: Um bárbaro corajoso, extremamente leal e ansioso por batalhas físicas, impaciente com enigmas.
+  * **Lyra (Magica Élfica Racional)**: Acadêmica eloquente e lógica, curiosa sobre forças arcanas e feitiços, com um leve toque de superioridade intelectual.
+  * **Nenhum (Eco do Ambiente)**: Se o jogador optar por viajar sozinho, este agente assume o papel de "Eco do Ambiente e Sussurro das Sombras", narrando presságios, calafrios e a tensão psicológica da solidão absoluta.
 * **LLM Ativa**: Vinculada à LLM Primária (DeepSeek) com chave de fallback ativo.
 
 ---
@@ -56,14 +58,14 @@ O loop de jogo executa um processo sequencial de três tarefas a cada ação sub
 * **Agente Responsável**: Agente Mestre
 * **Entradas (Contexto Injetado)**:
   * Histórico de Turnos Recentes (Últimos 3 turnos para consistência temporal).
-  * Estado Atual do Jogador (Vida atual, Inventário, Ambiente Geográfico Atual).
+  * Estado Atual do Jogador (Vida atual, Inventário, Habilidades/Skills ativas, Ambiente Geográfico Atual).
   * Ação do Jogador (Input bruto recebido da API).
 * **Descrição da Tarefa**:
-  > Analise a ação do jogador: "{player_action}". Com base no estado atual do jogador (Vida: {health}, Inventário: {inventory}) e no ambiente geográfico ativo ({current_environment}), determine o resultado da ação.
-  > Se a ação envolver perigo ou combate, calcule o sucesso e as consequências físicas baseadas nas regras daquela região.
-  > Se o jogador for atingido, calcule o dano (um número inteiro). Se ele usar um item de cura do inventário, remova-o do inventário e determine a cura.
-  > Retorne uma descrição factual das consequências no ambiente física e o resumo das alterações de estado (vida perdida/ganha, itens adicionados/removidos).
-* **Estrutura de Saída**: Pydantic Schema (`ActionResolutionModel` contendo a narrativa física, variação de vida e modificações de itens).
+  * Analise a ação do jogador: "{player_action}". Com base no estado atual do jogador (Vida: {health}, Inventário: {inventory}, Habilidades: {skills}) e no ambiente geográfico ativo ({current_environment}), determine o resultado da ação.
+  * Se a ação envolver perigo ou combate, calcule o sucesso e as consequências físicas baseadas nas regras daquela região. Se o jogador tentar utilizar uma de suas Habilidades ativas, determine se ela teve sucesso.
+  * Se o jogador for atingido, calcule o dano (um número inteiro). Se ele usar um item de cura do inventário, remova-o do inventário e determine a cura. A Crew também pode narrar e conceder novas habilidades (aprendizado por eventos/tomos) ou remover habilidades (esquecimento/maldições), adicionando-as nas listas de controle do JSON de saída.
+  * Retorne uma descrição factual das consequências físicas no ambiente e o resumo das alterações de estado (vida perdida/ganha, itens adicionados/removidos, habilidades aprendidas/removidas).
+* **Estrutura de Saída**: Pydantic Schema (`ActionResolutionModel` contendo a narrativa física, variação de vida, modificações de itens e modificações de habilidades).
 
 ### Tarefa 2: Reação do Companheiro (Diálogo)
 * **Agente Responsável**: Agente NPC

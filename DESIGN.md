@@ -84,5 +84,28 @@ O console foi distribuído em uma grade responsiva moderna de 12 colunas com lay
    * **Alternativas Sugeridas**: Botões rápidos de sugestões de ações, que somem em carregamentos.
    * **Barra de Ação Livre**: Campo de texto com botão com gradiente de roxo para rosa, fixado na base do console.
 2. **Coluna Direita (Status / Telemetria - 380px)**:
-   * **Card do Herói**: Identidade do jogador (nome, classe com ícones contextuais de combate, barra de vida e inventário).
+   * **Card do Herói**: Identidade do jogador (nome, classe com ícones contextuais de combate, barra de vida, lista de companheiros ativos, lista de habilidades ativas (⚡) e inventário agrupado).
    * **Card de Telemetria da IA**: Painel técnico exibindo dados de performance do backend (modelo de IA ativo, latência de resposta, fallbacks automáticos e acumulador de tokens consumidos).
+
+---
+
+## 7. Assistente de Criação Passo a Passo (Wizard Flow)
+
+A tela inicial foi dividida em um assistente de 5 etapas para evitar fadiga de decisão e guiar o jogador na ambientação da aventura:
+1. **Passo 1 (Nome)**: Entrada textual do nome do personagem com validação de preenchimento.
+2. **Passo 2 (Classe)**: Grade interativa de seleção de arquétipo (Guerreiro, Mago, Ladino, Clérigo).
+3. **Passo 3 (NPC)**: Escolha de companheiro inicial com backstories dedicados ou opção de começar sozinho.
+4. **Passo 4 (Ambiente)**: Seleção do ambiente geográfico de início.
+5. **Passo 5 (Configurações)**: Ajustes de opções de jogo, vindo habilitados por padrão ("Narrativa Curta e Dinâmica" e "Sugerir Alternativas de Ação").
+* **Barra de Progresso**: Um indicador visual de linha com círculos numerados interativos que se iluminam à medida que o jogador avança. Permite retroceder aos passos passados ao clicar nos círculos.
+* **Prevenção de Ghost Clicks**: Desabilitação temporária de 400ms do botão "Adentrar a Masmorra" ao entrar no Passo 5 para evitar double-taps acidentais oriundos do botão "Avançar" do Passo 4.
+
+---
+
+## 8. Responsividade Móvel (Mobile Layout)
+
+A interface se adapta organicamente a dispositivos móveis e tablets usando media queries do CSS:
+* **Grids de Coluna Única**: Abaixo de `768px`, a visualização em duas colunas é convertida em uma única coluna vertical. O console de narrativa ganha destaque no topo, enquanto os status e a telemetria rolam para a base da página.
+* **Menus Empilhados**: O grid de opções de criação de personagem (2 colunas) se reconfigura para 1 coluna vertical em larguras estreitas para acomodar o toque.
+* **Rótulos Curto-Responsivos**: Os nomes das etapas do assistente no celular são abreviados ("Nome", "Classe", "NPC", "Início", "Configs") para evitar encavalamento de textos.
+* **Ajuste de Formulário**: Abaixo de `480px`, o input de ação e o botão de envio se empilham verticalmente com 100% de largura para otimizar o espaço do teclado virtual.

@@ -152,10 +152,19 @@ Para oferecer uma experiência de RPG de texto de ponta, implementamos as seguin
    * Switch opcional na criação do personagem para que o Mestre (Game Master) forneça de 3 a 5 alternativas rápidas de ação clicáveis e contextuais para o próximo turno. O jogador pode optar por clicar em um botão ou ignorá-los e descrever sua ação livremente na caixa de entrada.
 3. **Narrativa Curta e Dinâmica**:
    * Switch opcional para forçar a CrewAI a gerar respostas e diálogos mais compactos, ágeis e diretos, economizando tempo de leitura e tokens.
-4. **Inventário Agrupado com Quantidades**:
-   * Itens repetidos são mesclados na interface com multiplicadores visuais (ex: `Pocao de Cura P - x3`) para melhor legibilidade. Quando uma poção é consumida em um turno, o backend gerencia a dedução de exatamente uma unidade do item do inventário do jogador.
+4. **Inventário Agrupado com Quantidades e Pluralização Dinâmica**:
+   * O backend extrai quantidades de textos como `"15 Moedas de Ouro"` e gerencia o inventário armazenando os itens individualmente na mochila do jogador.
+   * O frontend agrupa itens idênticos com multiplicadores e aplica a pluralização correta de exibição (ex: `"Moeda de Ouro"` para 1 unidade e `"Moedas de Ouro"` para mais de 1). Consumos parciais deduzem a quantidade exata do inventário do jogador.
 5. **Banner de Ambiente Contextual**:
    * O console de jogo exibe um banner dinâmico correspondente ao ambiente ativo. A borda esquerda e os efeitos de brilho do console adaptam suas cores de acordo com a atmosfera do local (ex: verde para a Floresta, ciano para a Cidade, dourado para o Deserto, vermelho para o Vulcão, etc.).
+6. **Seleção de Companheiro NPC Dinâmico**:
+   * O jogador pode selecionar o NPC inicial da equipe (`Eldon`, `Grom`, `Lyra` ou viajar sozinho). O motor do jogo resolve a backstory e o papel do agente de forma dinâmica. Se optar por ir sozinho, o NPC assume a persona "Sussurro das Sombras" reagindo de forma abstrata à solidão e tensão psicológica do herói.
+7. **Sistema de Habilidades Dinâmicas**:
+   * O jogador inicia com habilidades correspondentes ao arquétipo de sua classe (ex: Mago começa com `Bola de Fogo` e `Míssil Mágico`). Durante a jornada narrativa, novas habilidades podem ser aprendidas de tomos ou pergaminhos, ou perdidas devido a maldições e esquecimento, atualizando o HUD lateral em tempo real.
+8. **Assistente Passo a Passo (Wizard Setup)**:
+   * A criação do herói é dividida em 5 passos animados com indicador de progresso interativo. Inclui proteção de debounce de 400ms na última tela de configurações para neutralizar cliques rápidos fantasmas e impedir envios de formulário incorretos via tecla `Enter`.
+9. **Responsividade Móvel Nativa (Mobile UI/UX)**:
+   * Interface otimizada via CSS Media Queries para smartphones e tablets. Os painéis de narrativa e HUD lateral se adaptam para colunas verticais integradas, reduzindo rótulos e redimensionando campos de inputs de forma natural.
 
 ---
 

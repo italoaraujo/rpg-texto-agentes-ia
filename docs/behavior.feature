@@ -52,3 +52,22 @@ Funcionalidade: Fluxos do Turno de RPG, Atualização de Vida e Resiliência de 
       | active_model         | gpt-4o-mini |
       | fallback_triggered   | true        |
     E a latência da requisição da IA deve ser registrada na métrica correspondente sob o modelo "gpt-4o-mini"
+
+  Cenário: Escolha de companheiro inicial NPC na criação do personagem
+    Dado que o jogador inicia um novo jogo
+    Quando ele seleciona "Lyra" como companheira de início e classe "Mago"
+    Então o motor do jogo deve instanciar a Crew com o agente NPC assumindo a backstory de "Lyra"
+    E a lista de companheiros retornada no estado inicial do jogador deve conter "Lyra"
+    E o inventário inicial e as habilidades correspondentes à classe "Mago" devem ser associados ao jogador
+
+  Cenário: Aprendizado dinâmico de novas habilidades ao longo da jornada
+    Dado que o jogador possui a habilidade "Bola de Fogo" e classe "Mago"
+    Quando a CrewAI resolve na narrativa que o jogador decifrou um tomo antigo e aprendeu a habilidade "Sopro de Gelo"
+    Então a lista de habilidades no estado do jogador deve incluir "Bola de Fogo" e "Sopro de Gelo"
+    E a interface gráfica no Frontend deve renderizar as duas habilidades com o indicador visual correspondente
+
+  Cenário: Seleção passo a passo e debounce no envio das configurações de partida
+    Dado que o jogador está na tela de criação de personagem
+    Quando ele avança pelas etapas do assistente passo a passo até chegar no Passo 5
+    Então o botão de finalização "Adentrar a Masmorra" deve ficar desabilitado temporariamente por 400ms
+    E as opções de "Narrativa Curta e Dinâmica" e "Sugerir Alternativas de Ação" devem vir previamente marcadas como ativo

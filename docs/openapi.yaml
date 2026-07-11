@@ -129,6 +129,12 @@ components:
           enum: [Guerreiro, Mago, Ladino, Clerigo]
           example: "Guerreiro"
           description: Classe do personagem que determina atributos iniciais e interações.
+        starting_companion:
+          type: string
+          nullable: true
+          default: null
+          example: "Eldon"
+          description: O companheiro inicial selecionado (Eldon, Grom, Lyra ou nenhum).
         starting_environment:
           type: string
           enum: [Masmorra, Floresta, Cidade, Deserto, Montanha, Pantano, Oceano, Vulcao, Ceu]
@@ -230,6 +236,8 @@ components:
         - health
         - max_health
         - inventory
+        - companions
+        - skills
         - alive
       properties:
         health:
@@ -246,6 +254,18 @@ components:
             type: string
           example: ["Espada de Bronze", "Pocao de Cura P", "Escudo de Madeira"]
           description: Itens atualmente carregados pelo jogador no inventário.
+        companions:
+          type: array
+          items:
+            type: string
+          example: ["Eldon"]
+          description: Lista de companheiros (NPCs) que estão atualmente acompanhando o jogador.
+        skills:
+          type: array
+          items:
+            type: string
+          example: ["Bola de Fogo", "Míssil Mágico"]
+          description: Habilidades conhecidas/ativas pelo jogador.
         alive:
           type: boolean
           example: true
