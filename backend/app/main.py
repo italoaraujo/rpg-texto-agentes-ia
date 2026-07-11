@@ -46,6 +46,10 @@ def start_game(request: StartGameRequest):
     # Para o turno de introdução, orquestramos a Crew interpretando a ação inicial do jogador
     intro_action = f"Explorar a região de {request.starting_environment} e observar o ambiente ao redor."
     
+    initial_companions = []
+    if request.starting_companion and request.starting_companion != "Nenhum":
+        initial_companions = [request.starting_companion]
+
     try:
         narrative, current_env, suggested_actions, player_state, telemetry = run_game_turn(
             game_id=game_id,
@@ -54,6 +58,7 @@ def start_game(request: StartGameRequest):
             player_action=intro_action,
             current_health=100,
             current_inventory=initial_inventory,
+            current_companions=initial_companions,
             short_narrative=request.short_narrative,
             suggest_actions=request.suggest_actions,
             current_environment=request.starting_environment
@@ -69,6 +74,7 @@ def start_game(request: StartGameRequest):
             "suggest_actions": request.suggest_actions,
             "health": player_state["health"],
             "inventory": player_state["inventory"],
+            "companions": player_state["companions"],
             "alive": player_state["alive"]
         }
         rpg_active_sessions_count.set(len(games_db))
@@ -111,6 +117,7 @@ def process_turn(request: ProcessTurnRequest):
             player_action=request.player_action,
             current_health=game_state["health"],
             current_inventory=game_state["inventory"],
+            current_companions=game_state.get("companions", ["Eldon"]),
             short_narrative=game_state["short_narrative"],
             suggest_actions=game_state.get("suggest_actions", False),
             current_environment=game_state.get("current_environment", "Masmorra")
@@ -120,6 +127,7 @@ def process_turn(request: ProcessTurnRequest):
         games_db[request.game_id].update({
             "health": player_state["health"],
             "inventory": player_state["inventory"],
+            "companions": player_state["companions"],
             "current_environment": current_env,
             "alive": player_state["alive"]
         })

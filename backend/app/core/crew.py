@@ -65,6 +65,7 @@ def run_game_turn(
     player_action: str,
     current_health: int,
     current_inventory: List[str],
+    current_companions: List[str],
     short_narrative: bool = False,
     suggest_actions: bool = False,
     current_environment: str = "Masmorra"
@@ -116,10 +117,11 @@ def run_game_turn(
         )
         
         # 2. Cria agentes e tarefas
+        active_companion = current_companions[0] if current_companions else None
         gm_agent = create_game_master_agent(llm)
-        npc_agent = create_npc_agent(llm)
+        npc_agent = create_npc_agent(llm, active_companion)
         
-        t1 = create_arbitration_task(gm_agent, player_action, current_health, current_inventory, character_class, short_narrative, current_environment, callback=t1_callback)
+        t1 = create_arbitration_task(gm_agent, player_action, current_health, current_inventory, current_companions, character_class, short_narrative, current_environment, callback=t1_callback)
         t2 = create_npc_reaction_task(npc_agent, t1, short_narrative, callback=t2_callback)
         t3 = create_consolidation_task(gm_agent, t1, t2, short_narrative, suggest_actions, current_environment, callback=t3_callback)
         
@@ -179,10 +181,11 @@ def run_game_turn(
                 max_tokens=max_tokens_fallback
             )
             
+            active_companion = current_companions[0] if current_companions else None
             gm_agent = create_game_master_agent(llm_fallback)
-            npc_agent = create_npc_agent(llm_fallback)
+            npc_agent = create_npc_agent(llm_fallback, active_companion)
             
-            t1 = create_arbitration_task(gm_agent, player_action, current_health, current_inventory, character_class, short_narrative, current_environment, callback=t1_callback)
+            t1 = create_arbitration_task(gm_agent, player_action, current_health, current_inventory, current_companions, character_class, short_narrative, current_environment, callback=t1_callback)
             t2 = create_npc_reaction_task(npc_agent, t1, short_narrative, callback=t2_callback)
             t3 = create_consolidation_task(gm_agent, t1, t2, short_narrative, suggest_actions, current_environment, callback=t3_callback)
             
@@ -279,10 +282,16 @@ def run_game_turn(
     rpg_game_turns_total.labels(game_id=str(game_id)).inc()
     rpg_active_environment_turns_total.labels(biome=updated_env).inc()
  
+    # Extrai a lista de companheiros ativa do retorno JSON
+    updated_companions = resolved_data.get("companions", current_companions)
+    if not isinstance(updated_companions, list):
+        updated_companions = current_companions
+
     player_state = {
         "health": new_health,
         "max_health": 100,
         "inventory": updated_inventory,
+        "companions": updated_companions,
         "alive": new_health > 0
     }
  

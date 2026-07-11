@@ -11,6 +11,7 @@ class LLMConfig(BaseModel):
 class StartGameRequest(BaseModel):
     player_name: str = Field(..., example="Arthur Pendragon")
     character_class: str = Field(..., example="Guerreiro") # Ex: Guerreiro, Mago, Ladino, Clerigo
+    starting_companion: Optional[str] = Field(default=None, example="Eldon")
     starting_environment: str = Field(default="Masmorra", example="Masmorra")
     short_narrative: bool = Field(default=False, example=False)
     suggest_actions: bool = Field(default=False, example=False)
@@ -24,6 +25,7 @@ class PlayerState(BaseModel):
     health: int = Field(..., example=85)
     max_health: int = Field(default=100, example=100)
     inventory: List[str] = Field(default_factory=list, example=["Espada de Bronze", "Pocao de Cura P"])
+    companions: List[str] = Field(default_factory=list, example=["Eldon"])
     alive: bool = Field(default=True)
 
 class TokenUsage(BaseModel):

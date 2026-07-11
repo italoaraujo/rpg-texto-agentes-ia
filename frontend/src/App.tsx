@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { 
   Shield, 
   Sword, 
   Sparkles, 
   User, 
+  Users,
   Send, 
   Heart, 
   Briefcase, 
@@ -19,6 +20,7 @@ interface PlayerState {
   health: number;
   max_health: number;
   inventory: string[];
+  companions: string[];
   alive: boolean;
 }
 
@@ -57,6 +59,9 @@ export default function App() {
   const [suggestActions, setSuggestActions] = useState(() => {
     return localStorage.getItem('rpg_suggest_actions') === 'true';
   });
+  const [startingCompanion, setStartingCompanion] = useState(() => {
+    return localStorage.getItem('rpg_starting_companion') || 'Eldon';
+  });
   const [startingEnvironment, setStartingEnvironment] = useState(() => {
     return localStorage.getItem('rpg_starting_environment') || 'Masmorra';
   });
@@ -82,6 +87,7 @@ export default function App() {
       health: 100,
       max_health: 100,
       inventory: [],
+      companions: [],
       alive: true
     };
   });
@@ -111,6 +117,7 @@ export default function App() {
       localStorage.setItem('rpg_suggested_actions', JSON.stringify(suggestedActions));
       localStorage.setItem('rpg_starting_environment', startingEnvironment);
       localStorage.setItem('rpg_current_environment', currentEnvironment);
+      localStorage.setItem('rpg_starting_companion', startingCompanion);
       if (telemetry) {
         localStorage.setItem('rpg_telemetry', JSON.stringify(telemetry));
       }
@@ -125,9 +132,10 @@ export default function App() {
       localStorage.removeItem('rpg_suggested_actions');
       localStorage.removeItem('rpg_starting_environment');
       localStorage.removeItem('rpg_current_environment');
+      localStorage.removeItem('rpg_starting_companion');
       localStorage.removeItem('rpg_telemetry');
     }
-  }, [gameId, playerName, characterClass, playerState, narrativeHistory, telemetry, shortNarrative, suggestActions, suggestedActions, startingEnvironment, currentEnvironment]);
+  }, [gameId, playerName, characterClass, playerState, narrativeHistory, telemetry, shortNarrative, suggestActions, suggestedActions, startingEnvironment, currentEnvironment, startingCompanion]);
 
   // Faz scroll automático no console de narrativa
   useEffect(() => {
@@ -139,6 +147,13 @@ export default function App() {
     { name: 'Mago', icon: '🔮', desc: 'Dominador de magias arcanas.' },
     { name: 'Ladino', icon: '🗡️', desc: 'Especialista em furtividade e astúcia.' },
     { name: 'Clerigo', icon: '🛡️', desc: 'Canalizador de cura e poder sagrado.' }
+  ];
+
+  const companions_list = [
+    { name: 'Eldon', icon: '👤', desc: 'Arqueólogo cauteloso, especialista em símbolos e ruínas antigas.' },
+    { name: 'Grom', icon: '🪓', desc: 'Guerreiro bárbaro impulsivo, destemido e focado em força física.' },
+    { name: 'Lyra', icon: '🔮', desc: 'Maga élfica racional, focada em decifrar mistérios e forças mágicas.' },
+    { name: 'Nenhum', icon: '❌', desc: 'Começar a aventura inteiramente sozinho.' }
   ];
 
   const environments = [
@@ -168,6 +183,7 @@ export default function App() {
         body: JSON.stringify({
           player_name: playerName,
           character_class: characterClass,
+          starting_companion: startingCompanion,
           starting_environment: startingEnvironment,
           short_narrative: shortNarrative,
           suggest_actions: suggestActions
@@ -351,6 +367,26 @@ export default function App() {
                     <div className="class-name">{cls.name}</div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                       {cls.desc}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginTop: '20px' }}>
+              <label className="form-label">Companheiro Inicial (NPC)</label>
+              <div className="class-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))' }}>
+                {companions_list.map((npc: { name: string; icon: string; desc: string }) => (
+                  <div 
+                    key={npc.name}
+                    className={`class-option ${startingCompanion === npc.name ? 'selected' : ''}`}
+                    onClick={() => !loading && setStartingCompanion(npc.name)}
+                    style={{ padding: '14px 10px' }}
+                  >
+                    <div className="class-icon" style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{npc.icon}</div>
+                    <div className="class-name" style={{ fontSize: '0.85rem' }}>{npc.name === 'Nenhum' ? 'Sem Companheiro' : npc.name}</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', textAlign: 'center', lineHeight: '1.2' }}>
+                      {npc.desc}
                     </div>
                   </div>
                 ))}
@@ -724,6 +760,57 @@ export default function App() {
                   💀 FIM DE JOGO
                 </div>
               )}
+            </div>
+
+            {/* Companheiros da Equipe */}
+            <div style={{ marginBottom: '20px' }}>
+              <div className="health-header" style={{ marginBottom: '12px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  <Users size={16} />
+                  Companheiros da Equipe
+                </span>
+              </div>
+              <div className="companions-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {playerState.companions && playerState.companions.length > 0 ? (
+                  playerState.companions.map((npc: string, idx: number) => (
+                    <div 
+                      key={idx} 
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '10px',
+                        padding: '10px 14px',
+                        fontSize: '0.88rem',
+                        transition: 'var(--transition-smooth)',
+                        cursor: 'default'
+                      }}
+                      onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                        e.currentTarget.style.borderColor = 'var(--accent-purple-light)';
+                        e.currentTarget.style.boxShadow = '0 0 10px rgba(168, 85, 247, 0.12)';
+                      }}
+                      onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
+                        e.currentTarget.style.borderColor = 'var(--border-color)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '1.1rem' }}>👤</span>
+                        <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{npc}</span>
+                      </div>
+                      <span style={{ fontSize: '0.72rem', background: 'rgba(168, 85, 247, 0.15)', color: 'var(--accent-purple-light)', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>NPC</span>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic', padding: '10px 14px', border: '1px dashed var(--border-color)', borderRadius: '10px', textAlign: 'center' }}>
+                    Nenhum companheiro no grupo.
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Inventário */}

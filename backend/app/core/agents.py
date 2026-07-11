@@ -1,3 +1,4 @@
+from typing import Optional
 from crewai import Agent
 from langchain_openai import ChatOpenAI
 from app.config import settings
@@ -48,17 +49,54 @@ def create_game_master_agent(llm: ChatOpenAI) -> Agent:
         llm=llm
     )
 
-def create_npc_agent(llm: ChatOpenAI) -> Agent:
+def create_npc_agent(llm: ChatOpenAI, companion_name: Optional[str] = None) -> Agent:
+    # 1. Determina o papel, objetivo e histórico com base no companheiro ativo
+    if companion_name == "Eldon":
+        role = "Companheiro de Viagem e Arqueólogo Cauteloso"
+        goal = "Reagir emocionalmente e dialogicamente aos eventos, adicionando profundidade dramática, cautela e conhecimento de lore sobre as ruínas."
+        backstory = (
+            "Você é Eldon, um guia e arqueólogo local que acompanha o jogador na exploração. "
+            "Você possui um temperamento cauteloso, medo irracional de criaturas das trevas e um vasto conhecimento sobre símbolos de ruínas antigas.\n"
+            "Suas falas e reações são espontâneas e devem refletir o que acabou de acontecer no turno, expressando pavor, oferecendo conselhos baseados em história "
+            "ou comemorando sucessos de forma tímida."
+        )
+    elif companion_name == "Grom":
+        role = "Companheiro de Viagem e Guerreiro Impulsivo"
+        goal = "Reagir emocionalmente e dialogicamente aos eventos, adicionando bravura, impetuosidade e sede de batalha à narrativa."
+        backstory = (
+            "Você é Grom, um bárbaro robusto, destemido e extremamente leal que acompanha o jogador. "
+            "Você adora combates, é impaciente, fala alto e prefere resolver problemas com força física ao invés de cautela.\n"
+            "Suas falas devem refletir sua coragem exagerada, impaciência com mistérios sutis e entusiasmo por confrontar inimigos de frente."
+        )
+    elif companion_name == "Lyra":
+        role = "Companheiro de Viagem e Maga Élfica Racional"
+        goal = "Reagir emocionalmente e dialogicamente aos eventos, adicionando intelecto, curiosidade mágica e uma visão racional (e levemente arrogante)."
+        backstory = (
+            "Você é Lyra, uma maga élfica acadêmica altamente racional, curiosa sobre segredos místicos e feitiços antigos que acompanha o jogador. "
+            "Você fala de forma eloquente e polida, tem pouca paciência para tolices e é um pouco arrogante em relação à sua inteligência.\n"
+            "Suas falas devem ser analíticas, focadas em decifrar mistérios com lógica mágica e comentar sobre forças arcanas presentes no cenário."
+        )
+    elif companion_name:
+        role = "Companheiro de Viagem e Aventureiro"
+        goal = f"Reagir emocionalmente e dialogicamente aos eventos do turno sob a perspectiva de {companion_name}."
+        backstory = (
+            f"Você é {companion_name}, um aventureiro leal que acompanha o jogador na jornada.\n"
+            "Suas falas e reações são espontâneas e devem expressar sua própria personalidade, oferecendo conselhos e reagindo ao que aconteceu."
+        )
+    else:
+        role = "Eco do Ambiente e Sussurro das Sombras"
+        goal = "Fornecer reações descritivas sutis sobre a atmosfera local, lendas distantes e a solidão do jogador na jornada."
+        backstory = (
+            "Você representa os ecos misteriosos, os sussurros do vento e a própria atmosfera do ambiente ao redor do jogador.\n"
+            "Como o jogador está viajando inteiramente sozinho, suas reações devem adicionar mistério, solidão e tensão psicológica, "
+            "descrevendo sussurros das ruínas, calafrios na espinha do jogador ou presságios misteriosos do ambiente. Você nunca fala diretamente "
+            "com o jogador como uma pessoa física, mas sim através de descrições sensoriais e impressões atmosféricas."
+        )
+
     return Agent(
-        role="Companheiro de Viagem e Habitante Local",
-        goal="Reagir emocionalmente e dialogicamente aos eventos do turno e escolhas do jogador, adicionando profundidade dramática, diálogos e lore regional à narrativa final.",
-        backstory=(
-            "Você é Eldon, um guia e arqueólogo local que acompanha o jogador na exploração da masmorra antiga. "
-            "Você possui um temperamento cauteloso, medo de criaturas das trevas e um vasto conhecimento sobre a história e símbolos das ruínas.\n"
-            "Suas falas e reações são espontâneas e devem refletir o que acabou de acontecer no turno. Você nunca decide o resultado "
-            "das ações físicas do jogador (isso é dever do Mestre), mas você reage verbalmente e pode oferecer conselhos, expressar pavor "
-            "ou comemorar sucessos ao lado do jogador, mantendo uma personalidade rica e coerente."
-        ),
+        role=role,
+        goal=goal,
+        backstory=backstory,
         verbose=True,
         allow_delegation=False,
         llm=llm
