@@ -58,6 +58,27 @@ def normalize_item_name(name: str) -> str:
     )
     return name
 
+def parse_item_and_qty(item_str: str) -> Tuple[str, int]:
+    import re
+    item_str = item_str.strip()
+    match = re.match(r"^(\d+)\s+(.+)$", item_str)
+    if match:
+        qty = int(match.group(1))
+        name = match.group(2).strip()
+    else:
+        qty = 1
+        name = item_str
+
+    name_lower = name.lower()
+    if "moeda" in name_lower:
+        name = "Moeda de Ouro"
+    elif "pocao de cura p" in name_lower or "poção de cura p" in name_lower or "pocão de cura p" in name_lower:
+        name = "Pocao de Cura P"
+    elif "pocao de cura" in name_lower or "poção de cura" in name_lower or "pocão de cura" in name_lower:
+        name = "Pocao de Cura P"
+        
+    return name, qty
+
 def run_game_turn(
     game_id: UUID,
     player_name: str,
@@ -245,32 +266,35 @@ def run_game_turn(
     # Adição/Remoção de Itens
     updated_inventory = list(current_inventory)
     for it in resolved_data.get("items_added", []):
-        if it not in updated_inventory:
-            updated_inventory.append(it)
+        name, qty = parse_item_and_qty(it)
+        for _ in range(qty):
+            updated_inventory.append(name)
             
     for it in resolved_data.get("items_removed", []):
-        norm_it = normalize_item_name(it)
-        match_item = None
-        
-        # 1. Tenta correspondência exata normalizada (sem acentos, caixa baixa)
-        for inv_item in updated_inventory:
-            if normalize_item_name(inv_item) == norm_it:
-                match_item = inv_item
-                break
-                
-        # 2. Se não encontrou, tenta correspondência parcial (ex: "pocao de cura" contido em "pocao de cura p")
-        if not match_item:
+        name, qty = parse_item_and_qty(it)
+        for _ in range(qty):
+            norm_name = normalize_item_name(name)
+            match_item = None
+            
+            # 1. Tenta correspondência exata normalizada (sem acentos, caixa baixa)
             for inv_item in updated_inventory:
-                norm_inv_item = normalize_item_name(inv_item)
-                if norm_it in norm_inv_item or norm_inv_item in norm_it:
+                if normalize_item_name(inv_item) == norm_name:
                     match_item = inv_item
                     break
                     
-        if match_item:
-            updated_inventory.remove(match_item)
-            rpg_player_items_consumed_total.labels(item_name=match_item).inc()
-        else:
-            print(f"[WARNING] Item '{it}' solicitado para remoção não foi encontrado no inventário: {updated_inventory}")
+            # 2. Se não encontrou, tenta correspondência parcial (ex: "pocao de cura" contido em "pocao de cura p")
+            if not match_item:
+                for inv_item in updated_inventory:
+                    norm_inv_item = normalize_item_name(inv_item)
+                    if norm_name in norm_inv_item or norm_inv_item in norm_name:
+                        match_item = inv_item
+                        break
+                        
+            if match_item:
+                updated_inventory.remove(match_item)
+                rpg_player_items_consumed_total.labels(item_name=match_item).inc()
+            else:
+                print(f"[WARNING] Item '{name}' solicitado para remoção não foi encontrado no inventário: {updated_inventory}")
  
     # 7. Atualiza o Gauge de vida no Prometheus
     rpg_player_health.labels(

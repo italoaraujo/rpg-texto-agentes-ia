@@ -314,9 +314,32 @@ export default function App() {
   const getGroupedInventory = (inventory: string[]) => {
     const counts: { [key: string]: number } = {};
     inventory.forEach(item => {
-      counts[item] = (counts[item] || 0) + 1;
+      const match = item.trim().match(/^(\d+)\s+(.+)$/);
+      let name = item.trim();
+      let qty = 1;
+      if (match) {
+        qty = parseInt(match[1], 10);
+        name = match[2].trim();
+      }
+
+      const nameLower = name.toLowerCase();
+      if (nameLower.includes('moeda')) {
+        name = 'Moeda de Ouro';
+      } else if (nameLower.includes('pocao de cura p') || nameLower.includes('poção de cura p') || nameLower.includes('pocão de cura p')) {
+        name = 'Pocao de Cura P';
+      }
+
+      counts[name] = (counts[name] || 0) + qty;
     });
-    return Object.entries(counts).map(([name, count]) => ({ name, count }));
+
+    return Object.entries(counts).map(([name, count]) => {
+      let displayName = name;
+      if (count > 1) {
+        if (name === 'Moeda de Ouro') displayName = 'Moedas de Ouro';
+        else if (name === 'Pocao de Cura P') displayName = 'Poções de Cura P';
+      }
+      return { name: displayName, count };
+    });
   };
 
   if (screen === 'setup') {
