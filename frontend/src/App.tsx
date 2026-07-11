@@ -55,10 +55,12 @@ export default function App() {
     return localStorage.getItem('rpg_character_class') || 'Guerreiro';
   });
   const [shortNarrative, setShortNarrative] = useState(() => {
-    return localStorage.getItem('rpg_short_narrative') === 'true';
+    const saved = localStorage.getItem('rpg_short_narrative');
+    return saved !== null ? saved === 'true' : true;
   });
   const [suggestActions, setSuggestActions] = useState(() => {
-    return localStorage.getItem('rpg_suggest_actions') === 'true';
+    const saved = localStorage.getItem('rpg_suggest_actions');
+    return saved !== null ? saved === 'true' : true;
   });
   const [startingCompanion, setStartingCompanion] = useState(() => {
     return localStorage.getItem('rpg_starting_companion') || 'Eldon';
@@ -102,6 +104,20 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [actionInput, setActionInput] = useState('');
   const [connectionError, setConnectionError] = useState(false);
+  const [setupStep, setSetupStep] = useState(1);
+  const [canSubmit, setCanSubmit] = useState(false);
+
+  useEffect(() => {
+    if (setupStep === 5) {
+      setCanSubmit(false);
+      const timer = setTimeout(() => {
+        setCanSubmit(true);
+      }, 400);
+      return () => clearTimeout(timer);
+    } else {
+      setCanSubmit(false);
+    }
+  }, [setupStep]);
   
   const historyEndRef = useRef<HTMLDivElement>(null);
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -169,6 +185,18 @@ export default function App() {
     { name: 'Vulcao', icon: '🌋', desc: 'Rios de lava e cavernas quentes.' },
     { name: 'Ceu', icon: '☁️', desc: 'Ilhas flutuantes e ventos fortes.' }
   ];
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (setupStep < 5) {
+      if (setupStep === 1 && !playerName.trim()) return;
+      setSetupStep(prev => prev + 1);
+    } else {
+      if (canSubmit) {
+        handleStartGame(e);
+      }
+    }
+  };
 
   // Inicia o jogo no Backend
   const handleStartGame = async (e: React.FormEvent) => {
@@ -291,6 +319,9 @@ export default function App() {
     setCurrentEnvironment('Masmorra');
     setPlayerName('');
     setTelemetry(null);
+    setSetupStep(1);
+    setShortNarrative(true);
+    setSuggestActions(true);
   };
 
   // Funções utilitárias de UI
@@ -364,174 +395,267 @@ export default function App() {
             </div>
           )}
 
-          <form onSubmit={handleStartGame} className="setup-form">
-            <div className="form-group">
-              <label className="form-label">Nome do Herói</label>
-              <input 
-                type="text" 
-                className="form-input" 
-                placeholder="Ex: Arthur, o Destemido"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                required
-                maxLength={25}
-                disabled={loading}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Classe do Herói</label>
-              <div className="class-grid">
-                {classes.map((cls) => (
-                  <div 
-                    key={cls.name}
-                    className={`class-option ${characterClass === cls.name ? 'selected' : ''}`}
-                    onClick={() => !loading && setCharacterClass(cls.name)}
+          <form onSubmit={handleFormSubmit} className="setup-form">
+            {/* Indicador Visual do Passo a Passo */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px', position: 'relative' }}>
+              {[1, 2, 3, 4, 5].map((stepNum) => (
+                <div key={stepNum} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, zIndex: 2 }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    background: setupStep >= stepNum ? 'var(--accent-purple)' : 'rgba(255, 255, 255, 0.05)',
+                    border: `2px solid ${setupStep === stepNum ? 'var(--accent-purple-light)' : 'var(--border-color)'}`,
+                    color: setupStep >= stepNum ? '#fff' : 'var(--text-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 'bold',
+                    fontSize: '0.85rem',
+                    boxShadow: setupStep === stepNum ? '0 0 10px rgba(168, 85, 247, 0.3)' : 'none',
+                    transition: 'var(--transition-smooth)',
+                    cursor: stepNum < setupStep ? 'pointer' : 'default'
+                  }}
+                  onClick={() => stepNum < setupStep && setSetupStep(stepNum)}
                   >
-                    <div className="class-icon">{cls.icon}</div>
-                    <div className="class-name">{cls.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                      {cls.desc}
-                    </div>
+                    {stepNum}
                   </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="form-group" style={{ marginTop: '20px' }}>
-              <label className="form-label">Companheiro Inicial (NPC)</label>
-              <div className="class-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))' }}>
-                {companions_list.map((npc: { name: string; icon: string; desc: string }) => (
-                  <div 
-                    key={npc.name}
-                    className={`class-option ${startingCompanion === npc.name ? 'selected' : ''}`}
-                    onClick={() => !loading && setStartingCompanion(npc.name)}
-                    style={{ padding: '14px 10px' }}
-                  >
-                    <div className="class-icon" style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{npc.icon}</div>
-                    <div className="class-name" style={{ fontSize: '0.85rem' }}>{npc.name === 'Nenhum' ? 'Sem Companheiro' : npc.name}</div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', textAlign: 'center', lineHeight: '1.2' }}>
-                      {npc.desc}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="form-group" style={{ marginTop: '20px' }}>
-              <label className="form-label">Ambiente de Início</label>
-              <div className="class-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))' }}>
-                {environments.map((env) => (
-                  <div 
-                    key={env.name}
-                    className={`class-option ${startingEnvironment === env.name ? 'selected' : ''}`}
-                    onClick={() => !loading && setStartingEnvironment(env.name)}
-                    style={{ padding: '14px 10px' }}
-                  >
-                    <div className="class-icon" style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{env.icon}</div>
-                    <div className="class-name" style={{ fontSize: '0.85rem' }}>{env.name}</div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', textAlign: 'center', lineHeight: '1.2' }}>
-                      {env.desc}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Toggle para Narrativa Curta e Dinâmica */}
-            <div 
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '16px',
-                borderRadius: '12px',
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid var(--border-color)',
-                cursor: 'pointer',
-                margin: '8px 0',
-                transition: 'var(--transition-smooth)'
-              }}
-              onClick={() => !loading && setShortNarrative(!shortNarrative)}
-            >
-              <input 
-                type="checkbox" 
-                id="shortNarrative" 
-                checked={shortNarrative} 
-                onChange={(e) => setShortNarrative(e.target.checked)}
-                style={{ 
-                  width: '18px', 
-                  height: '18px', 
-                  cursor: 'pointer', 
-                  accentColor: 'var(--accent-purple)' 
-                }}
-                disabled={loading}
-              />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', cursor: 'pointer' }}>
-                <label 
-                  htmlFor="shortNarrative" 
-                  className="form-label" 
-                  style={{ margin: 0, cursor: 'pointer', fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}
-                >
-                  Narrativa Curta e Dinâmica
-                </label>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  A Crew responderá com diálogos e ações físicas mais ágeis e diretas.
-                </span>
-              </div>
-            </div>
-
-            {/* Toggle para Sugestão de Alternativas */}
-            <div 
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '16px',
-                borderRadius: '12px',
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid var(--border-color)',
-                cursor: 'pointer',
-                margin: '8px 0 16px 0',
-                transition: 'var(--transition-smooth)'
-              }}
-              onClick={() => !loading && setSuggestActions(!suggestActions)}
-            >
-              <input 
-                type="checkbox" 
-                id="suggestActions" 
-                checked={suggestActions} 
-                onChange={(e) => setSuggestActions(e.target.checked)}
-                style={{ 
-                  width: '18px', 
-                  height: '18px', 
-                  cursor: 'pointer', 
-                  accentColor: 'var(--accent-purple)' 
-                }}
-                disabled={loading}
-              />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', cursor: 'pointer' }}>
-                <label 
-                  htmlFor="suggestActions" 
-                  className="form-label" 
-                  style={{ margin: 0, cursor: 'pointer', fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}
-                >
-                  Sugerir Alternativas de Ação
-                </label>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  O narrador fornecerá de 3 a 5 opções pré-definidas clicáveis a cada turno.
-                </span>
-              </div>
-            </div>
-
-            <button type="submit" className="start-button" disabled={loading || !playerName.trim()}>
-              {loading ? (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
-                  <div className="spinner"></div>
-                  Invocando a Crew...
+                  <span style={{ fontSize: '0.7rem', color: setupStep >= stepNum ? 'var(--text-main)' : 'var(--text-muted)', marginTop: '6px', fontWeight: setupStep === stepNum ? 600 : 400 }}>
+                    {stepNum === 1 ? 'Nome' :
+                     stepNum === 2 ? 'Classe' :
+                     stepNum === 3 ? 'Companheiro' :
+                     stepNum === 4 ? 'Ambiente' : 'Configurações'}
+                  </span>
                 </div>
-              ) : 'Adentrar a Masmorra'}
-            </button>
+              ))}
+              <div style={{
+                position: 'absolute',
+                top: '16px',
+                left: '10%',
+                right: '10%',
+                height: '2px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                zIndex: 1
+              }}>
+                <div style={{
+                  width: `${((setupStep - 1) / 4) * 100}%`,
+                  height: '100%',
+                  background: 'var(--accent-purple)',
+                  transition: 'var(--transition-smooth)'
+                }}></div>
+              </div>
+            </div>
+
+            {/* Conteúdo do Passo Ativo */}
+            {setupStep === 1 && (
+              <div className="form-group" style={{ animation: 'fadeIn 0.3s ease-out' }}>
+                <label className="form-label">Nome do Herói</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  placeholder="Ex: Arthur, o Destemido"
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  required
+                  maxLength={25}
+                  disabled={loading}
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {setupStep === 2 && (
+              <div className="form-group" style={{ animation: 'fadeIn 0.3s ease-out' }}>
+                <label className="form-label">Classe do Herói</label>
+                <div className="class-grid">
+                  {classes.map((cls) => (
+                    <div 
+                      key={cls.name}
+                      className={`class-option ${characterClass === cls.name ? 'selected' : ''}`}
+                      onClick={() => !loading && setCharacterClass(cls.name)}
+                    >
+                      <div className="class-icon">{cls.icon}</div>
+                      <div className="class-name">{cls.name}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        {cls.desc}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {setupStep === 3 && (
+              <div className="form-group" style={{ animation: 'fadeIn 0.3s ease-out' }}>
+                <label className="form-label">Companheiro Inicial (NPC)</label>
+                <div className="class-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))' }}>
+                  {companions_list.map((npc: { name: string; icon: string; desc: string }) => (
+                    <div 
+                      key={npc.name}
+                      className={`class-option ${startingCompanion === npc.name ? 'selected' : ''}`}
+                      onClick={() => !loading && setStartingCompanion(npc.name)}
+                      style={{ padding: '14px 10px' }}
+                    >
+                      <div className="class-icon" style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{npc.icon}</div>
+                      <div className="class-name" style={{ fontSize: '0.85rem' }}>{npc.name === 'Nenhum' ? 'Sem Companheiro' : npc.name}</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', textAlign: 'center', lineHeight: '1.2' }}>
+                        {npc.desc}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {setupStep === 4 && (
+              <div className="form-group" style={{ animation: 'fadeIn 0.3s ease-out' }}>
+                <label className="form-label">Ambiente de Início</label>
+                <div className="class-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))' }}>
+                  {environments.map((env) => (
+                    <div 
+                      key={env.name}
+                      className={`class-option ${startingEnvironment === env.name ? 'selected' : ''}`}
+                      onClick={() => !loading && setStartingEnvironment(env.name)}
+                      style={{ padding: '14px 10px' }}
+                    >
+                      <div className="class-icon" style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{env.icon}</div>
+                      <div className="class-name" style={{ fontSize: '0.85rem' }}>{env.name}</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', textAlign: 'center', lineHeight: '1.2' }}>
+                        {env.desc}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {setupStep === 5 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', animation: 'fadeIn 0.3s ease-out' }}>
+                <label className="form-label">Configurações de Partida</label>
+                
+                {/* Toggle para Narrativa Curta e Dinâmica */}
+                <div 
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '16px',
+                    borderRadius: '12px',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid var(--border-color)',
+                    cursor: 'pointer',
+                    transition: 'var(--transition-smooth)'
+                  }}
+                  onClick={() => !loading && setShortNarrative(!shortNarrative)}
+                >
+                  <input 
+                    type="checkbox" 
+                    id="shortNarrative" 
+                    checked={shortNarrative} 
+                    onChange={(e) => setShortNarrative(e.target.checked)}
+                    style={{ 
+                      width: '18px', 
+                      height: '18px', 
+                      cursor: 'pointer', 
+                      accentColor: 'var(--accent-purple)' 
+                    }}
+                    disabled={loading}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', cursor: 'pointer' }}>
+                    <label 
+                      htmlFor="shortNarrative" 
+                      className="form-label" 
+                      style={{ margin: 0, cursor: 'pointer', fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}
+                    >
+                      Narrativa Curta e Dinâmica
+                    </label>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      A Crew responderá com diálogos e ações físicas mais ágeis e diretas.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Toggle para Sugestão de Alternativas */}
+                <div 
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '16px',
+                    borderRadius: '12px',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid var(--border-color)',
+                    cursor: 'pointer',
+                    transition: 'var(--transition-smooth)'
+                  }}
+                  onClick={() => !loading && setSuggestActions(!suggestActions)}
+                >
+                  <input 
+                    type="checkbox" 
+                    id="suggestActions" 
+                    checked={suggestActions} 
+                    onChange={(e) => setSuggestActions(e.target.checked)}
+                    style={{ 
+                      width: '18px', 
+                      height: '18px', 
+                      cursor: 'pointer', 
+                      accentColor: 'var(--accent-purple)' 
+                    }}
+                    disabled={loading}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', cursor: 'pointer' }}>
+                    <label 
+                      htmlFor="suggestActions" 
+                      className="form-label" 
+                      style={{ margin: 0, cursor: 'pointer', fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}
+                    >
+                      Sugerir Alternativas de Ação
+                    </label>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      O narrador fornecerá de 3 a 5 opções pré-definidas clicáveis a cada turno.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Botões de Ação do Passo a Passo */}
+            <div style={{ display: 'flex', gap: '12px', marginTop: '32px' }}>
+              {setupStep > 1 && (
+                <button 
+                  type="button" 
+                  onClick={() => setSetupStep(prev => prev - 1)} 
+                  className="start-button" 
+                  style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border-color)', color: 'var(--text-main)', flex: 1 }}
+                  disabled={loading}
+                >
+                  Voltar
+                </button>
+              )}
+              {setupStep < 5 ? (
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    if (setupStep === 1 && !playerName.trim()) return;
+                    setSetupStep(prev => prev + 1);
+                  }} 
+                  className="start-button"
+                  style={{ flex: 2 }}
+                  disabled={setupStep === 1 && !playerName.trim()}
+                >
+                  Avançar
+                </button>
+              ) : (
+                <button type="submit" className="start-button" style={{ flex: 2 }} disabled={loading || !playerName.trim() || !canSubmit}>
+                  {loading ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
+                      <div className="spinner"></div>
+                      Invocando a Crew...
+                    </div>
+                  ) : 'Adentrar a Masmorra'}
+                </button>
+              )}
+            </div>
           </form>
         </div>
       </div>

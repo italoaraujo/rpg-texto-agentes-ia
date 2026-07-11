@@ -119,7 +119,7 @@ O ambiente completo do projeto é conteinerizado e gerenciado através do arquiv
 
 ### Portas Mapeadas do Ambiente
 * **Backend FastAPI**: `http://localhost:8000` (Endpoints `/game/*` e `/metrics`)
-* **Frontend React (Vite)**: `http://localhost:5174`
+* **Frontend React (Vite)**: `http://localhost:5173`
 * **Prometheus**: `http://localhost:9090` (Visualização direta de métricas e targets)
 * **Grafana**: `http://localhost:3001` (Dashboard com credenciais padrão `admin` / `admin`)
 
