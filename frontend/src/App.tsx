@@ -11,7 +11,6 @@ import {
   Activity, 
   Cpu, 
   Clock, 
-  Layers, 
   RotateCcw 
 } from 'lucide-react'
 
@@ -52,7 +51,7 @@ export default function App() {
     return localStorage.getItem('rpg_player_name') || '';
   });
   const [characterClass, setCharacterClass] = useState(() => {
-    return localStorage.getItem('rpg_character_class') || 'Guerreiro';
+    return localStorage.getItem('rpg_character_class') || '';
   });
   const [shortNarrative, setShortNarrative] = useState(() => {
     const saved = localStorage.getItem('rpg_short_narrative');
@@ -63,10 +62,10 @@ export default function App() {
     return saved !== null ? saved === 'true' : true;
   });
   const [startingCompanion, setStartingCompanion] = useState(() => {
-    return localStorage.getItem('rpg_starting_companion') || 'Eldon';
+    return localStorage.getItem('rpg_starting_companion') || '';
   });
   const [startingEnvironment, setStartingEnvironment] = useState(() => {
-    return localStorage.getItem('rpg_starting_environment') || 'Masmorra';
+    return localStorage.getItem('rpg_starting_environment') || '';
   });
   const [currentEnvironment, setCurrentEnvironment] = useState(() => {
     return localStorage.getItem('rpg_current_environment') || 'Masmorra';
@@ -106,9 +105,10 @@ export default function App() {
   const [connectionError, setConnectionError] = useState(false);
   const [setupStep, setSetupStep] = useState(1);
   const [canSubmit, setCanSubmit] = useState(false);
+  const [warning, setWarning] = useState<string | null>(null);
 
   useEffect(() => {
-    if (setupStep === 5) {
+    if (setupStep === 6) {
       setCanSubmit(false);
       const timer = setTimeout(() => {
         setCanSubmit(true);
@@ -118,6 +118,7 @@ export default function App() {
       setCanSubmit(false);
     }
   }, [setupStep]);
+  
   
   const historyEndRef = useRef<HTMLDivElement>(null);
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -186,11 +187,36 @@ export default function App() {
     { name: 'Ceu', icon: '☁️', desc: 'Ilhas flutuantes e ventos fortes.' }
   ];
 
+  const handleNextStep = () => {
+    if (setupStep === 1) {
+      if (!playerName.trim()) {
+        setWarning('Por favor, defina o nome do seu herói antes de prosseguir!');
+        return;
+      }
+    } else if (setupStep === 2) {
+      if (!characterClass) {
+        setWarning('Por favor, escolha uma classe para o seu herói!');
+        return;
+      }
+    } else if (setupStep === 3) {
+      if (!startingCompanion) {
+        setWarning('Por favor, escolha um companheiro inicial!');
+        return;
+      }
+    } else if (setupStep === 4) {
+      if (!startingEnvironment) {
+        setWarning('Por favor, escolha um ambiente de início!');
+        return;
+      }
+    }
+    setWarning(null);
+    setSetupStep(prev => prev + 1);
+  };
+
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (setupStep < 5) {
-      if (setupStep === 1 && !playerName.trim()) return;
-      setSetupStep(prev => prev + 1);
+    if (setupStep < 6) {
+      handleNextStep();
     } else {
       if (canSubmit) {
         handleStartGame(e);
@@ -318,10 +344,14 @@ export default function App() {
     setSuggestedActions([]);
     setCurrentEnvironment('Masmorra');
     setPlayerName('');
+    setCharacterClass('');
+    setStartingCompanion('');
+    setStartingEnvironment('');
     setTelemetry(null);
     setSetupStep(1);
     setShortNarrative(true);
     setSuggestActions(true);
+    setWarning(null);
   };
 
   // Funções utilitárias de UI
@@ -398,7 +428,7 @@ export default function App() {
           <form onSubmit={handleFormSubmit} className="setup-form">
             {/* Indicador Visual do Passo a Passo */}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px', position: 'relative' }}>
-              {[1, 2, 3, 4, 5].map((stepNum) => (
+              {[1, 2, 3, 4, 5, 6].map((stepNum) => (
                 <div key={stepNum} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, zIndex: 2 }}>
                   <div style={{
                     width: '32px',
@@ -416,7 +446,12 @@ export default function App() {
                     transition: 'var(--transition-smooth)',
                     cursor: stepNum < setupStep ? 'pointer' : 'default'
                   }}
-                  onClick={() => stepNum < setupStep && setSetupStep(stepNum)}
+                  onClick={() => {
+                    if (stepNum < setupStep) {
+                      setSetupStep(stepNum);
+                      setWarning(null);
+                    }
+                  }}
                   >
                     {stepNum}
                   </div>
@@ -424,21 +459,22 @@ export default function App() {
                     {stepNum === 1 ? 'Nome' :
                      stepNum === 2 ? 'Classe' :
                      stepNum === 3 ? 'NPC' :
-                     stepNum === 4 ? 'Início' : 'Configs'}
+                     stepNum === 4 ? 'Início' :
+                     stepNum === 5 ? 'Configs' : 'Revisão'}
                   </span>
                 </div>
               ))}
               <div style={{
                 position: 'absolute',
                 top: '16px',
-                left: '10%',
-                right: '10%',
+                left: '8%',
+                right: '8%',
                 height: '2px',
                 background: 'rgba(255, 255, 255, 0.05)',
                 zIndex: 1
               }}>
                 <div style={{
-                  width: `${((setupStep - 1) / 4) * 100}%`,
+                  width: `${((setupStep - 1) / 5) * 100}%`,
                   height: '100%',
                   background: 'var(--accent-purple)',
                   transition: 'var(--transition-smooth)'
@@ -455,12 +491,22 @@ export default function App() {
                   className="form-input" 
                   placeholder="Ex: Arthur, o Destemido"
                   value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
+                  onChange={(e) => {
+                    setPlayerName(e.target.value);
+                    if (warning) setWarning(null);
+                  }}
                   required
                   maxLength={25}
                   disabled={loading}
                   autoFocus
+                  style={warning ? { borderColor: 'var(--accent-red)', boxShadow: '0 0 0 2px rgba(255, 0, 84, 0.15)' } : {}}
                 />
+                {warning && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-red)', fontSize: '0.85rem', marginTop: '6px', animation: 'fadeIn 0.2s ease-out' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '16px', height: '16px', borderRadius: '50%', background: 'rgba(255, 0, 84, 0.15)', fontSize: '0.75rem', fontWeight: 'bold' }}>!</span>
+                    <span>Preencha o nome do seu herói</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -472,7 +518,13 @@ export default function App() {
                     <div 
                       key={cls.name}
                       className={`class-option ${characterClass === cls.name ? 'selected' : ''}`}
-                      onClick={() => !loading && setCharacterClass(cls.name)}
+                      onClick={() => {
+                        if (!loading) {
+                          setCharacterClass(cls.name);
+                          if (warning) setWarning(null);
+                        }
+                      }}
+                      style={warning ? { borderColor: 'rgba(255, 0, 84, 0.3)' } : {}}
                     >
                       <div className="class-icon">{cls.icon}</div>
                       <div className="class-name">{cls.name}</div>
@@ -482,6 +534,12 @@ export default function App() {
                     </div>
                   ))}
                 </div>
+                {warning && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-red)', fontSize: '0.85rem', marginTop: '10px', animation: 'fadeIn 0.2s ease-out' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '16px', height: '16px', borderRadius: '50%', background: 'rgba(255, 0, 84, 0.15)', fontSize: '0.75rem', fontWeight: 'bold' }}>!</span>
+                    <span>Selecione a classe do seu herói</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -493,8 +551,13 @@ export default function App() {
                     <div 
                       key={npc.name}
                       className={`class-option ${startingCompanion === npc.name ? 'selected' : ''}`}
-                      onClick={() => !loading && setStartingCompanion(npc.name)}
-                      style={{ padding: '14px 10px' }}
+                      onClick={() => {
+                        if (!loading) {
+                          setStartingCompanion(npc.name);
+                          if (warning) setWarning(null);
+                        }
+                      }}
+                      style={{ padding: '14px 10px', ...(warning ? { borderColor: 'rgba(255, 0, 84, 0.3)' } : {}) }}
                     >
                       <div className="class-icon" style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{npc.icon}</div>
                       <div className="class-name" style={{ fontSize: '0.85rem' }}>{npc.name === 'Nenhum' ? 'Sem Companheiro' : npc.name}</div>
@@ -504,6 +567,12 @@ export default function App() {
                     </div>
                   ))}
                 </div>
+                {warning && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-red)', fontSize: '0.85rem', marginTop: '10px', animation: 'fadeIn 0.2s ease-out' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '16px', height: '16px', borderRadius: '50%', background: 'rgba(255, 0, 84, 0.15)', fontSize: '0.75rem', fontWeight: 'bold' }}>!</span>
+                    <span>Selecione seu companheiro inicial</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -515,8 +584,13 @@ export default function App() {
                     <div 
                       key={env.name}
                       className={`class-option ${startingEnvironment === env.name ? 'selected' : ''}`}
-                      onClick={() => !loading && setStartingEnvironment(env.name)}
-                      style={{ padding: '14px 10px' }}
+                      onClick={() => {
+                        if (!loading) {
+                          setStartingEnvironment(env.name);
+                          if (warning) setWarning(null);
+                        }
+                      }}
+                      style={{ padding: '14px 10px', ...(warning ? { borderColor: 'rgba(255, 0, 84, 0.3)' } : {}) }}
                     >
                       <div className="class-icon" style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{env.icon}</div>
                       <div className="class-name" style={{ fontSize: '0.85rem' }}>{env.name}</div>
@@ -526,6 +600,12 @@ export default function App() {
                     </div>
                   ))}
                 </div>
+                {warning && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-red)', fontSize: '0.85rem', marginTop: '10px', animation: 'fadeIn 0.2s ease-out' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '16px', height: '16px', borderRadius: '50%', background: 'rgba(255, 0, 84, 0.15)', fontSize: '0.75rem', fontWeight: 'bold' }}>!</span>
+                    <span>Selecione o ambiente de início</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -619,12 +699,92 @@ export default function App() {
               </div>
             )}
 
+            {setupStep === 6 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', animation: 'fadeIn 0.3s ease-out' }}>
+                <label className="form-label">Confirmar Escolhas do Herói</label>
+                
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.01)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Nome:</span>
+                    <span style={{ fontWeight: 600, color: 'var(--accent-purple-light)', fontSize: '0.9rem' }}>{playerName}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Classe:</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.9rem' }}>
+                      {characterClass === 'Guerreiro' ? '⚔️ Guerreiro' :
+                       characterClass === 'Mago' ? '🔮 Mago' :
+                       characterClass === 'Ladino' ? '🗡️ Ladino' : '🛡️ Clérigo'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Companheiro Inicial:</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.9rem' }}>
+                      {startingCompanion === 'Nenhum' ? 'Sem Companheiro (❌)' : startingCompanion}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Ambiente de Início:</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {startingEnvironment === 'Floresta' ? '🌲 Floresta' :
+                       startingEnvironment === 'Cidade' ? '🏰 Cidade' :
+                       startingEnvironment === 'Deserto' ? '🏜️ Deserto' :
+                       startingEnvironment === 'Montanha' ? '🏔️ Montanha' :
+                       startingEnvironment === 'Pantano' ? '🕸️ Pântano' :
+                       startingEnvironment === 'Oceano' ? '🌊 Oceano' :
+                       startingEnvironment === 'Vulcao' ? '🌋 Vulcão' :
+                       startingEnvironment === 'Ceu' ? '☁️ Céu' : '💀 Masmorra'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Opções da Narrativa:</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        background: 'rgba(157, 78, 221, 0.08)',
+                        color: 'var(--accent-purple-light)',
+                        border: '1px solid rgba(157, 78, 221, 0.15)',
+                        padding: '4px 8px',
+                        borderRadius: '6px'
+                      }}>
+                        {shortNarrative ? 'Narrativa Curta e Dinâmica' : 'Narrativa Longa'}
+                      </span>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        background: 'rgba(0, 245, 212, 0.08)',
+                        color: 'var(--accent-cyan)',
+                        border: '1px solid rgba(0, 245, 212, 0.15)',
+                        padding: '4px 8px',
+                        borderRadius: '6px'
+                      }}>
+                        {suggestActions ? 'Sugestão de Ações' : 'Sem Sugestões'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Botões de Ação do Passo a Passo */}
             <div style={{ display: 'flex', gap: '12px', marginTop: '32px' }}>
               {setupStep > 1 && (
                 <button 
                   type="button" 
-                  onClick={() => setSetupStep(prev => prev - 1)} 
+                  onClick={() => {
+                    setSetupStep(prev => prev - 1);
+                    setWarning(null);
+                  }} 
                   className="start-button" 
                   style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border-color)', color: 'var(--text-main)', flex: 1 }}
                   disabled={loading}
@@ -632,16 +792,12 @@ export default function App() {
                   Voltar
                 </button>
               )}
-              {setupStep < 5 ? (
+              {setupStep < 6 ? (
                 <button 
                   type="button" 
-                  onClick={() => {
-                    if (setupStep === 1 && !playerName.trim()) return;
-                    setSetupStep(prev => prev + 1);
-                  }} 
+                  onClick={handleNextStep} 
                   className="start-button"
                   style={{ flex: 2 }}
-                  disabled={setupStep === 1 && !playerName.trim()}
                 >
                   Avançar
                 </button>
@@ -652,7 +808,7 @@ export default function App() {
                       <div className="spinner"></div>
                       Invocando a Crew...
                     </div>
-                  ) : 'Adentrar a Masmorra'}
+                  ) : 'Iniciar Aventura'}
                 </button>
               )}
             </div>
