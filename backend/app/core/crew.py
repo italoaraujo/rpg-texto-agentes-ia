@@ -25,7 +25,7 @@ from app.core.telemetry import (
 )
 
 def clean_json_output(output_str: str) -> Dict[str, Any]:
-    """Extrai e limpa a resposta JSON da LLM, tratando marcações markdown."""
+    """Extrai e limpa a resposta JSON da LLM, tratando marcações markdown de forma altamente resiliente."""
     try:
         # Se a saída estiver embrulhada em blocos de código markdown ```json ... ```
         match = re.search(r"```json\s*(.*?)\s*```", output_str, re.DOTALL)
@@ -39,15 +39,42 @@ def clean_json_output(output_str: str) -> Dict[str, Any]:
         return json.loads(json_str)
     except Exception as e:
         print(f"[ERROR] Falha ao parsear JSON da narrativa: {e}. String bruta: {output_str}")
-        # Fallback de emergência caso a LLM quebre o formato
+        
+        # Fallback resiliente usando regex para tentar extrair campos chave do JSON incompleto/inválido
+        narrative = ""
+        # Procura por "narrative": "..." tratando aspas escapadas
+        match_narrative = re.search(r'"narrative"\s*:\s*"((?:[^"\\]|\\.)*)"', output_str, re.DOTALL)
+        if match_narrative:
+            # Desescapa aspas e quebras de linha para exibição limpa
+            narrative = match_narrative.group(1).replace('\\"', '"').replace('\\n', '\n')
+        else:
+            # Se parecer um JSON quebrado mas não capturou narrative, fornece um feedback amigável
+            if "{" in output_str or '"narrative"' in output_str:
+                narrative = "Ocorreu um tremor místico e a visão se dissipou... (Erro na formatação da narrativa)."
+            else:
+                # Se não tem indícios de JSON, assume que a LLM respondeu com texto puro direto
+                narrative = output_str
+
+        health_change = 0
+        match_health = re.search(r'"health_change"\s*:\s*(-?\d+)', output_str)
+        if match_health:
+            health_change = int(match_health.group(1))
+
+        # Tenta pegar o current_environment via regex
+        current_env = "Masmorra"
+        match_env = re.search(r'"current_environment"\s*:\s*"([^"]+)"', output_str)
+        if match_env:
+            current_env = match_env.group(1)
+
         return {
-            "narrative": output_str,
-            "health_change": -5,  # Penalidade pequena por erro crítico
+            "narrative": narrative,
+            "health_change": health_change,
             "items_added": [],
             "items_removed": [],
             "suggested_actions": [],
-            "current_environment": "Masmorra"
+            "current_environment": current_env
         }
+
 
 def normalize_item_name(name: str) -> str:
     import unicodedata
@@ -144,7 +171,7 @@ def run_game_turn(
         npc_agent = create_npc_agent(llm, active_companion)
         
         t1 = create_arbitration_task(gm_agent, player_action, current_health, current_inventory, current_companions, current_skills, character_class, short_narrative, current_environment, callback=t1_callback)
-        t2 = create_npc_reaction_task(npc_agent, t1, short_narrative, callback=t2_callback)
+        t2 = create_npc_reaction_task(npc_agent, t1, active_companion, short_narrative, callback=t2_callback)
         t3 = create_consolidation_task(gm_agent, t1, t2, current_skills, short_narrative, suggest_actions, current_environment, callback=t3_callback)
         
         crew = Crew(
@@ -208,7 +235,7 @@ def run_game_turn(
             npc_agent = create_npc_agent(llm_fallback, active_companion)
             
             t1 = create_arbitration_task(gm_agent, player_action, current_health, current_inventory, current_companions, current_skills, character_class, short_narrative, current_environment, callback=t1_callback)
-            t2 = create_npc_reaction_task(npc_agent, t1, short_narrative, callback=t2_callback)
+            t2 = create_npc_reaction_task(npc_agent, t1, active_companion, short_narrative, callback=t2_callback)
             t3 = create_consolidation_task(gm_agent, t1, t2, current_skills, short_narrative, suggest_actions, current_environment, callback=t3_callback)
             
             crew_fallback = Crew(
