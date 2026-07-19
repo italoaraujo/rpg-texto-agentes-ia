@@ -117,7 +117,8 @@ def run_game_turn(
     current_skills: List[str],
     short_narrative: bool = False,
     suggest_actions: bool = False,
-    current_environment: str = "Masmorra"
+    current_environment: str = "Masmorra",
+    history: List[Dict[str, str]] = None
 ) -> Tuple[str, str, List[str], Dict[str, Any], Dict[str, Any]]:
     """
     Orquestra o turno usando CrewAI.
@@ -170,7 +171,7 @@ def run_game_turn(
         gm_agent = create_game_master_agent(llm)
         npc_agent = create_npc_agent(llm, active_companion)
         
-        t1 = create_arbitration_task(gm_agent, player_action, current_health, current_inventory, current_companions, current_skills, character_class, short_narrative, current_environment, callback=t1_callback)
+        t1 = create_arbitration_task(gm_agent, player_action, current_health, current_inventory, current_companions, current_skills, character_class, short_narrative, current_environment, history=history, callback=t1_callback)
         t2 = create_npc_reaction_task(npc_agent, t1, active_companion, short_narrative, callback=t2_callback)
         t3 = create_consolidation_task(gm_agent, t1, t2, current_skills, short_narrative, suggest_actions, current_environment, callback=t3_callback)
         
@@ -234,7 +235,7 @@ def run_game_turn(
             gm_agent = create_game_master_agent(llm_fallback)
             npc_agent = create_npc_agent(llm_fallback, active_companion)
             
-            t1 = create_arbitration_task(gm_agent, player_action, current_health, current_inventory, current_companions, current_skills, character_class, short_narrative, current_environment, callback=t1_callback)
+            t1 = create_arbitration_task(gm_agent, player_action, current_health, current_inventory, current_companions, current_skills, character_class, short_narrative, current_environment, history=history, callback=t1_callback)
             t2 = create_npc_reaction_task(npc_agent, t1, active_companion, short_narrative, callback=t2_callback)
             t3 = create_consolidation_task(gm_agent, t1, t2, current_skills, short_narrative, suggest_actions, current_environment, callback=t3_callback)
             

@@ -1,6 +1,6 @@
 from crewai import Task, Agent
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Dict
 
 # Classes Pydantic internas para outputs estruturados intermediários (se suportados pelo CrewAI instalado)
 class ActionResolution(BaseModel):
@@ -10,13 +10,23 @@ class ActionResolution(BaseModel):
     items_added: List[str] = Field(default_factory=list, description="Itens adicionados ao inventário.")
     items_removed: List[str] = Field(default_factory=list, description="Itens consumidos ou removidos do inventário.")
 
-def create_arbitration_task(agent: Agent, player_action: str, health: int, inventory: List[str], companions: List[str], skills: List[str], class_name: str, short_narrative: bool = False, current_environment: str = "Masmorra", callback=None) -> Task:
+def create_arbitration_task(agent: Agent, player_action: str, health: int, inventory: List[str], companions: List[str], skills: List[str], class_name: str, short_narrative: bool = False, current_environment: str = "Masmorra", history: List[Dict[str, str]] = None, callback=None) -> Task:
     style_instruction = ""
     if short_narrative:
         style_instruction = "\nATENÇÃO: Escreva um resultado físico curto, rápido e direto ao ponto em apenas 1 parágrafo conciso."
 
+    history_instruction = ""
+    if history:
+        history_instruction = "\nHistórico das últimas mensagens/rodadas da sessão atual (use para lembrar acontecimentos anteriores e manter coerência narrativa):\n"
+        for i, turn in enumerate(history, 1):
+            history_instruction += f"Turno {i}:\n"
+            history_instruction += f"  Jogador: \"{turn.get('action', '')}\"\n"
+            history_instruction += f"  Narrador (Mestre): \"{turn.get('narrative', '')}\"\n"
+        history_instruction += "\n"
+
     return Task(
         description=(
+            f"{history_instruction}"
             f"Analise e resolva a ação do jogador: \"{player_action}\".\n"
             f"Considere os dados atuais do jogador e cenário:\n"
             f"- Ambiente Geográfico Ativo: {current_environment}\n"

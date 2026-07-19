@@ -57,7 +57,7 @@ O loop de jogo executa um processo sequencial de três tarefas a cada ação sub
 ### Tarefa 1: Resolução de Ação e Mecânica (Arbitragem)
 * **Agente Responsável**: Agente Mestre
 * **Entradas (Contexto Injetado)**:
-  * Histórico de Turnos Recentes (Últimos 3 turnos para consistência temporal).
+  * Histórico de Turnos Recentes (Últimos 10 turnos da sessão atual para consistência temporal).
   * Estado Atual do Jogador (Vida atual, Inventário, Habilidades/Skills ativas, Ambiente Geográfico Atual).
   * Ação do Jogador (Input bruto recebido da API).
 * **Descrição da Tarefa**:

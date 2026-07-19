@@ -88,7 +88,13 @@ def start_game(request: StartGameRequest):
             "inventory": player_state["inventory"],
             "companions": player_state["companions"],
             "skills": player_state["skills"],
-            "alive": player_state["alive"]
+            "alive": player_state["alive"],
+            "history": [
+                {
+                    "action": intro_action,
+                    "narrative": narrative
+                }
+            ]
         }
         rpg_active_sessions_count.set(len(games_db))
         
@@ -123,6 +129,7 @@ def process_turn(request: ProcessTurnRequest):
         )
         
     try:
+        history = game_state.get("history", [])
         narrative, current_env, suggested_actions, player_state, telemetry = run_game_turn(
             game_id=request.game_id,
             player_name=game_state["player_name"],
@@ -134,8 +141,17 @@ def process_turn(request: ProcessTurnRequest):
             current_skills=game_state.get("skills", []),
             short_narrative=game_state["short_narrative"],
             suggest_actions=game_state.get("suggest_actions", False),
-            current_environment=game_state.get("current_environment", "Masmorra")
+            current_environment=game_state.get("current_environment", "Masmorra"),
+            history=history
         )
+        
+        # Atualiza o histórico mantendo apenas as últimas 10 mensagens/rodadas
+        new_history = list(history)
+        new_history.append({
+            "action": request.player_action,
+            "narrative": narrative
+        })
+        new_history = new_history[-10:]
         
         # Atualiza a persistência em memória
         games_db[request.game_id].update({
@@ -144,7 +160,8 @@ def process_turn(request: ProcessTurnRequest):
             "companions": player_state["companions"],
             "skills": player_state["skills"],
             "current_environment": current_env,
-            "alive": player_state["alive"]
+            "alive": player_state["alive"],
+            "history": new_history
         })
         
         return GameStateResponse(
@@ -168,3 +185,5 @@ def metrics():
         content=get_serialized_metrics(),
         media_type="text/plain; version=0.0.4"
     )
+
+
