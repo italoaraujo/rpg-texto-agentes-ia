@@ -40,6 +40,11 @@ class TelemetryMetadata(BaseModel):
     response_time_seconds: float = Field(..., example=2.45)
     tokens_consumed: TokenUsage
 
+class ActionEvent(BaseModel):
+    type: str = Field(..., example="health_loss")
+    message: str = Field(..., example="-15 de Vida")
+    timestamp: float = Field(..., example=171923405.0)
+
 class GameStateResponse(BaseModel):
     game_id: UUID
     narrative: str = Field(..., example="Você desfere um golpe certeiro no Orc...")
@@ -47,6 +52,7 @@ class GameStateResponse(BaseModel):
     suggested_actions: Optional[List[str]] = Field(default=None, example=["Atacar", "Defender", "Fugir"])
     player_state: PlayerState
     telemetry_metadata: TelemetryMetadata
+    action_history: List[ActionEvent] = Field(default_factory=list)
 
 class ErrorResponse(BaseModel):
     error_code: str = Field(..., example="TIMEOUT_FALLBACK_FAILED")

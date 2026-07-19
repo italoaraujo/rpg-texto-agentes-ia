@@ -1,12 +1,135 @@
 import uuid
+import time
+from collections import Counter
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict, Any
+from typing import Dict, Any, List
 from uuid import UUID
 
 from app.schemas.game import StartGameRequest, ProcessTurnRequest, GameStateResponse
 from app.core.crew import run_game_turn
 from app.core.telemetry import get_serialized_metrics, rpg_active_sessions_count
+
+def normalize_text_for_comparison(text: str) -> str:
+    import unicodedata
+    name = str(text).lower().strip()
+    name = "".join(
+        c for c in unicodedata.normalize("NFD", name)
+        if unicodedata.category(c) != "Mn"
+    )
+    return name
+
+def detect_state_changes(prev: dict, curr: dict, timestamp: float) -> list:
+    events = []
+    
+    # 1. Health change
+    prev_health = prev.get("health", 100)
+    curr_health = curr.get("health", 100)
+    if curr_health != prev_health:
+        diff = curr_health - prev_health
+        if diff > 0:
+            events.append({
+                "type": "health_gain",
+                "message": f"Curou {diff} de vida",
+                "timestamp": timestamp
+            })
+        else:
+            events.append({
+                "type": "health_loss",
+                "message": f"Sofreu {-diff} de dano",
+                "timestamp": timestamp
+            })
+    
+    # 2. Environment change
+    prev_env = prev.get("current_environment")
+    curr_env = curr.get("current_environment")
+    if prev_env and curr_env and normalize_text_for_comparison(prev_env) != normalize_text_for_comparison(curr_env):
+        events.append({
+            "type": "environment_change",
+            "message": f"Mudou de ambiente para {curr_env}",
+            "timestamp": timestamp
+        })
+        
+    # 3. Companions
+    prev_comp_raw = prev.get("companions", [])
+    curr_comp_raw = curr.get("companions", [])
+    
+    prev_comp = {normalize_text_for_comparison(c): c for c in prev_comp_raw}
+    curr_comp = {normalize_text_for_comparison(c): c for c in curr_comp_raw}
+    
+    # Joined
+    for norm_c in curr_comp.keys() - prev_comp.keys():
+        c = curr_comp[norm_c]
+        events.append({
+            "type": "companion_join",
+            "message": f"{c} entrou na equipe",
+            "timestamp": timestamp
+        })
+    # Left
+    for norm_c in prev_comp.keys() - curr_comp.keys():
+        c = prev_comp[norm_c]
+        events.append({
+            "type": "companion_leave",
+            "message": f"{c} saiu da equipe",
+            "timestamp": timestamp
+        })
+        
+    # 4. Skills
+    prev_skills_raw = prev.get("skills", [])
+    curr_skills_raw = curr.get("skills", [])
+    
+    prev_skills = {normalize_text_for_comparison(s): s for s in prev_skills_raw}
+    curr_skills = {normalize_text_for_comparison(s): s for s in curr_skills_raw}
+    
+    # Learned
+    for norm_s in curr_skills.keys() - prev_skills.keys():
+        s = curr_skills[norm_s]
+        events.append({
+            "type": "skill_learn",
+            "message": f"Aprendeu habilidade: {s}",
+            "timestamp": timestamp
+        })
+    # Lost
+    for norm_s in prev_skills.keys() - curr_skills.keys():
+        s = prev_skills[norm_s]
+        events.append({
+            "type": "skill_loss",
+            "message": f"Perdeu habilidade: {s}",
+            "timestamp": timestamp
+        })
+        
+    # 5. Items (Inventory)
+    prev_inv_raw = prev.get("inventory", [])
+    curr_inv_raw = curr.get("inventory", [])
+    
+    prev_inv = Counter(normalize_text_for_comparison(it) for it in prev_inv_raw)
+    curr_inv = Counter(normalize_text_for_comparison(it) for it in curr_inv_raw)
+    
+    item_display_names = {}
+    for it in prev_inv_raw + curr_inv_raw:
+        item_display_names[normalize_text_for_comparison(it)] = it
+        
+    all_items = set(prev_inv.keys()) | set(curr_inv.keys())
+    for norm_item in all_items:
+        p_count = prev_inv[norm_item]
+        c_count = curr_inv[norm_item]
+        display_name = item_display_names[norm_item]
+        if c_count > p_count:
+            diff = c_count - p_count
+            events.append({
+                "type": "item_obtained",
+                "message": f"Obteve: {display_name} (x{diff})" if diff > 1 else f"Obteve: {display_name}",
+                "timestamp": timestamp
+            })
+        elif p_count > c_count:
+            diff = p_count - c_count
+            events.append({
+                "type": "item_used",
+                "message": f"Usou/Perdeu: {display_name} (x{diff})" if diff > 1 else f"Usou/Perdeu: {display_name}",
+                "timestamp": timestamp
+            })
+            
+    return events
 
 app = FastAPI(
     title="RPG de Texto Baseado em Agentes - API",
@@ -76,6 +199,36 @@ def start_game(request: StartGameRequest):
             current_environment=request.starting_environment
         )
         
+        # Mapeamento do estado inicial antes de chamar o turno de introdução
+        pre_start_state = {
+            "health": 100,
+            "current_environment": request.starting_environment,
+            "inventory": initial_inventory,
+            "companions": initial_companions,
+            "skills": initial_skills
+        }
+        
+        # Mapeia o estado resultante
+        post_start_state = {
+            "health": player_state["health"],
+            "current_environment": current_env,
+            "inventory": player_state["inventory"],
+            "companions": player_state["companions"],
+            "skills": player_state["skills"]
+        }
+        
+        # Cria os eventos
+        t_now = time.time()
+        events = [{
+            "type": "game_start",
+            "message": "Jornada iniciada!",
+            "timestamp": t_now
+        }]
+        
+        # Detecta mudanças ocorridas no turno de introdução
+        intro_events = detect_state_changes(pre_start_state, post_start_state, t_now)
+        events.extend(intro_events)
+
         # Salva o estado atualizado no banco em memória
         games_db[game_id] = {
             "player_name": request.player_name,
@@ -94,7 +247,8 @@ def start_game(request: StartGameRequest):
                     "action": intro_action,
                     "narrative": narrative
                 }
-            ]
+            ],
+            "events": events
         }
         rpg_active_sessions_count.set(len(games_db))
         
@@ -104,7 +258,8 @@ def start_game(request: StartGameRequest):
             current_environment=current_env,
             suggested_actions=suggested_actions,
             player_state=player_state,
-            telemetry_metadata=telemetry
+            telemetry_metadata=telemetry,
+            action_history=events
         )
     except Exception as e:
         raise HTTPException(
@@ -153,6 +308,31 @@ def process_turn(request: ProcessTurnRequest):
         })
         new_history = new_history[-10:]
         
+        # Mapeia o estado antes do turno
+        prev_state = {
+            "health": game_state["health"],
+            "current_environment": game_state["current_environment"],
+            "inventory": game_state["inventory"],
+            "companions": game_state["companions"],
+            "skills": game_state["skills"]
+        }
+        
+        # Mapeia o estado resultante
+        post_state = {
+            "health": player_state["health"],
+            "current_environment": current_env,
+            "inventory": player_state["inventory"],
+            "companions": player_state["companions"],
+            "skills": player_state["skills"]
+        }
+        
+        t_now = time.time()
+        turn_events = detect_state_changes(prev_state, post_state, t_now)
+        
+        # Recupera eventos anteriores e estende com os novos
+        events = list(game_state.get("events", []))
+        events.extend(turn_events)
+        
         # Atualiza a persistência em memória
         games_db[request.game_id].update({
             "health": player_state["health"],
@@ -161,7 +341,8 @@ def process_turn(request: ProcessTurnRequest):
             "skills": player_state["skills"],
             "current_environment": current_env,
             "alive": player_state["alive"],
-            "history": new_history
+            "history": new_history,
+            "events": events
         })
         
         return GameStateResponse(
@@ -170,7 +351,8 @@ def process_turn(request: ProcessTurnRequest):
             current_environment=current_env,
             suggested_actions=suggested_actions,
             player_state=player_state,
-            telemetry_metadata=telemetry
+            telemetry_metadata=telemetry,
+            action_history=events
         )
     except Exception as e:
         raise HTTPException(

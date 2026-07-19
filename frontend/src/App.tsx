@@ -99,6 +99,11 @@ export default function App() {
     return saved ? JSON.parse(saved) : null;
   });
   
+  const [actionHistory, setActionHistory] = useState<any[]>(() => {
+    const saved = localStorage.getItem('rpg_action_history');
+    return saved ? JSON.parse(saved) : [];
+  });
+  
   // Estado de Controles de UI
   const [loading, setLoading] = useState(false);
   const [actionInput, setActionInput] = useState('');
@@ -137,6 +142,7 @@ export default function App() {
       localStorage.setItem('rpg_starting_environment', startingEnvironment);
       localStorage.setItem('rpg_current_environment', currentEnvironment);
       localStorage.setItem('rpg_starting_companion', startingCompanion);
+      localStorage.setItem('rpg_action_history', JSON.stringify(actionHistory));
       if (telemetry) {
         localStorage.setItem('rpg_telemetry', JSON.stringify(telemetry));
       }
@@ -152,9 +158,10 @@ export default function App() {
       localStorage.removeItem('rpg_starting_environment');
       localStorage.removeItem('rpg_current_environment');
       localStorage.removeItem('rpg_starting_companion');
+      localStorage.removeItem('rpg_action_history');
       localStorage.removeItem('rpg_telemetry');
     }
-  }, [gameId, playerName, characterClass, playerState, narrativeHistory, telemetry, shortNarrative, suggestActions, suggestedActions, startingEnvironment, currentEnvironment, startingCompanion]);
+  }, [gameId, playerName, characterClass, playerState, narrativeHistory, telemetry, shortNarrative, suggestActions, suggestedActions, startingEnvironment, currentEnvironment, startingCompanion, actionHistory]);
 
   // Faz scroll automático no console de narrativa
   useEffect(() => {
@@ -255,6 +262,7 @@ export default function App() {
       setTelemetry(data.telemetry_metadata);
       setSuggestedActions(data.suggested_actions || []);
       setCurrentEnvironment(data.current_environment);
+      setActionHistory(data.action_history || []);
       setNarrativeHistory([
         { type: 'narrative', text: data.narrative }
       ]);
@@ -309,6 +317,7 @@ export default function App() {
       setTelemetry(data.telemetry_metadata);
       setSuggestedActions(data.suggested_actions || []);
       setCurrentEnvironment(data.current_environment);
+      setActionHistory(data.action_history || []);
       setNarrativeHistory(prev => [...prev, { type: 'narrative', text: data.narrative }]);
     } catch (err: any) {
       console.error(err);
@@ -352,6 +361,7 @@ export default function App() {
     setShortNarrative(true);
     setSuggestActions(true);
     setWarning(null);
+    setActionHistory([]);
   };
 
   // Funções utilitárias de UI
@@ -368,6 +378,38 @@ export default function App() {
       case 'Ladino': return <User size={18} />;
       case 'Clerigo': return <Shield size={18} />;
       default: return <Sword size={18} />;
+    }
+  };
+
+  const getEventIcon = (type: string) => {
+    switch (type) {
+      case 'health_loss': return '🩸';
+      case 'health_gain': return '💚';
+      case 'item_obtained': return '📦';
+      case 'item_used': return '🧪';
+      case 'environment_change': return '🌍';
+      case 'companion_join': return '🤝';
+      case 'companion_leave': return '🚶';
+      case 'skill_learn': return '⚡';
+      case 'skill_loss': return '🌀';
+      case 'game_start': return '🎬';
+      default: return '📜';
+    }
+  };
+
+  const getEventColor = (type: string) => {
+    switch (type) {
+      case 'health_loss': return 'var(--accent-red)';
+      case 'health_gain': return '#10B981';
+      case 'item_obtained': return 'var(--accent-gold)';
+      case 'item_used': return 'var(--accent-purple-light)';
+      case 'environment_change': return 'var(--accent-cyan)';
+      case 'companion_join': return '#8B5CF6';
+      case 'companion_leave': return 'var(--text-muted)';
+      case 'skill_learn': return 'var(--accent-gold)';
+      case 'skill_loss': return 'var(--accent-red)';
+      case 'game_start': return 'var(--accent-cyan)';
+      default: return 'var(--text-main)';
     }
   };
 
@@ -1233,6 +1275,54 @@ export default function App() {
                   <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic', paddingLeft: '4px' }}>
                     Sua mochila está vazia.
                   </span>
+                )}
+              </div>
+            </div>
+
+            {/* Card de Histórico de Ações (Diário de Aventuras) */}
+            <div className="glass-panel" style={{ marginTop: '20px', padding: '16px' }}>
+              <h2 className="status-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '14px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
+                <Activity size={18} style={{ color: 'var(--accent-cyan)' }} />
+                Diário de Aventuras
+              </h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto', paddingRight: '4px' }}>
+                {actionHistory && actionHistory.length > 0 ? (
+                  [...actionHistory].reverse().map((evt: any, idx: number) => (
+                    <div 
+                      key={idx} 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'start', 
+                        gap: '10px', 
+                        fontSize: '0.82rem', 
+                        padding: '10px 12px', 
+                        background: 'rgba(255, 255, 255, 0.02)', 
+                        border: '1px solid var(--border-color)', 
+                        borderRadius: '8px',
+                        transition: 'var(--transition-smooth)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                        e.currentTarget.style.borderColor = getEventColor(evt.type);
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
+                        e.currentTarget.style.borderColor = 'var(--border-color)';
+                      }}
+                    >
+                      <span style={{ fontSize: '1.05rem', marginTop: '1px', lineHeight: 1 }}>{getEventIcon(evt.type)}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                        <span style={{ color: getEventColor(evt.type), fontWeight: 500, lineHeight: 1.3 }}>{evt.message}</span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', marginTop: '4px' }}>
+                          {new Date(evt.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic', textAlign: 'center', padding: '20px 0' }}>
+                    Nenhum registro ainda.
+                  </div>
                 )}
               </div>
             </div>
