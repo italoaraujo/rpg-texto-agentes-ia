@@ -159,7 +159,7 @@ def run_game_turn(
     try:
         print(f"[INFO] Iniciando turno do jogo {game_id} usando {active_model} (narrativa_curta={short_narrative}, sugerir_acoes={suggest_actions}, ambiente={current_environment})...")
         # 1. Instancia LLM Primária (DeepSeek) com timeout estrito de 4s
-        max_tokens = 500 if short_narrative else 1500
+        max_tokens = 1500 if short_narrative else 2500
         llm = get_llm(
             model_name=settings.PRIMARY_MODEL,
             timeout=settings.DEEPSEEK_TIMEOUT,
@@ -224,7 +224,7 @@ def run_game_turn(
         t2_end = None
         try:
             # Instancia LLM de fallback com timeout maior
-            max_tokens_fallback = 500 if short_narrative else 1500
+            max_tokens_fallback = 1500 if short_narrative else 2500
             llm_fallback = get_llm(
                 model_name=settings.FALLBACK_MODEL,
                 timeout=settings.FALLBACK_TIMEOUT,
