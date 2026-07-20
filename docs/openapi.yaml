@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: RPG de Texto Baseado em Agentes - API Backend
   description: >-
-    Especificação de API para o RPG de texto orquestrado por CrewAI utilizando a API do DeepSeek 
+    Especificação de API para o RPG de texto orquestrado por LangChain utilizando a API do DeepSeek 
     com fallback automático e telemetria Prometheus. Esta API serve de contrato entre o 
     Frontend React/TypeScript e o Backend FastAPI/Python.
   version: 1.0.0
@@ -36,7 +36,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '500':
-          description: Falha interna ao instanciar os agentes da CrewAI ou conectar às APIs de LLM.
+          description: Falha interna ao instanciar os agentes do LangChain ou conectar às APIs de LLM.
           content:
             application/json:
               schema:
@@ -145,7 +145,7 @@ components:
           type: boolean
           default: false
           example: false
-          description: Se verdadeiro, instrui a CrewAI a gerar descrições e diálogos mais curtos, rápidos e diretos.
+          description: Se verdadeiro, instrui o LangChain a gerar descrições e diálogos mais curtos, rápidos e diretos.
         suggest_actions:
           type: boolean
           default: false
@@ -179,7 +179,7 @@ components:
           minimum: 1
           default: 1500
           example: 1000
-          description: Limite de tokens para a resposta da narrativa da CrewAI.
+          description: Limite de tokens para a resposta da narrativa do LangChain.
 
     ProcessTurnRequest:
       type: object
@@ -214,7 +214,7 @@ components:
         narrative:
           type: string
           example: "Você desfere um golpe certeiro no Orc. O monstro urra de dor, mas contra-ataca rapidamente arranhando seu braço direito. Um halo misterioso brilha ao redor do altar central."
-          description: Narrativa rica gerada pelos agentes da CrewAI contendo as consequências da ação do jogador.
+          description: Narrativa rica gerada pelos agentes do LangChain contendo as consequências da ação do jogador.
         current_environment:
           type: string
           example: "Masmorra"
@@ -290,7 +290,7 @@ components:
         response_time_seconds:
           type: number
           example: 2.45
-          description: Tempo gasto para processar a resposta de IA da Crew neste turno.
+          description: Tempo gasto para processar a resposta de IA do LangChain neste turno.
         tokens_consumed:
           type: object
           properties:

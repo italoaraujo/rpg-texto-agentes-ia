@@ -1,4 +1,4 @@
-# RPG de Texto Baseado em Agentes com CrewAI, DeepSeek e Telemetria
+# RPG de Texto Baseado em Agentes com LangChain, DeepSeek e Telemetria
 
 Este repositório contém a arquitetura técnica, especificações de contrato de API, comportamento BDD e configurações de infraestrutura para o projeto do RPG de texto baseado em agentes de inteligência artificial.
 
@@ -9,7 +9,7 @@ Seguindo a metodologia **Spec-Driven Development (Desenvolvimento Orientado a Es
 ## 1. Tecnologias Utilizadas na Arquitetura
 
 * **Backend**: FastAPI (Python 3.11+) - Rápido, assíncrono e integrado nativamente com Pydantic para validação do OpenAPI.
-* **Orquestração de Agentes**: CrewAI - Utilizado para gerenciar a equipe sequencial de agentes com papéis focados (Game Master e NPC).
+* **Orquestração de Agentes**: LangChain (LCEL / Runnable Sequences) - Utilizado para gerenciar a pipeline de tarefas sequenciais de agentes com papéis focados (Game Master e NPC).
 * **Inteligência Artificial (LLM)**: API Oficial do DeepSeek (`deepseek-chat`) como engine principal e GPT-4o-Mini como fallback automático contra lentidão ou falhas.
 * **Telemetria**: Prometheus (coleta de métricas e medição de latência/tokens) e Grafana (visualização do dashboard).
 * **Frontend**: React (TypeScript / Vite) - Painel interativo para digitação de ações, renderização de narrativa literária e Gauge visual da vida do jogador em tempo real.
@@ -37,9 +37,9 @@ rpg-agentes/
 │   │   │       └── admin.py
 │   │   ├── core/
 │   │   │   ├── __init__.py
-│   │   │   ├── agents.py       # Definição dos agentes CrewAI (Game Master, NPC) com modelos DeepSeek
-│   │   │   ├── tasks.py        # Definição das tasks do CrewAI (Arbitragem, Diálogo, Consolidação)
-│   │   │   ├── crew.py         # Orquestrador da Crew contendo a lógica de tratamento de fallback de LLM
+│   │   │   ├── agents.py       # Definição dos prompts e personas dos Agentes (Game Master, NPC)
+│   │   │   ├── tasks.py        # Definição dos ChatPromptTemplates do LangChain (Arbitragem, Diálogo, Consolidação)
+│   │   │   ├── crew.py         # Orquestrador da pipeline LangChain contendo a lógica de tratamento de fallback de LLM
 │   │   │   └── telemetry.py    # Instanciação do Prometheus Client (Gauges, Counters e Histograms)
 │   │   └── schemas/
 │   │       ├── __init__.py
@@ -78,7 +78,7 @@ rpg-agentes/
 ├── docs/                       # Documentos contratuais de Especificação (Spec-Driven)
 │   ├── openapi.yaml            # Especificação OpenAPI 3.0 para a API do Backend
 │   ├── behavior.feature        # Cenários de teste BDD Gherkin (Dado/Quando/Então)
-│   ├── crew_architecture.md    # Estruturação detalhada de agentes, tarefas e injeção do DeepSeek
+│   ├── langchain_architecture.md # Estruturação detalhada dos agentes e pipeline do LangChain com DeepSeek
 │   └── telemetry_dashboard.md  # Queries PromQL e modelo JSON do painel Grafana
 │
 ├── prometheus.yml              # Arquivo de configuração do Prometheus scrape target
@@ -92,15 +92,15 @@ rpg-agentes/
 
 Os seguintes artefatos já estão disponíveis no diretório `./docs` e na raiz para consulta e orientação do desenvolvimento:
 
-1. **[openapi.yaml](file:///opt/aula/rpg-texto-agentes-ia/docs/openapi.yaml)**:
+1. **openapi.yaml**:
    Contrato estrito de rotas. Define esquemas robustos para `/game/start`, `/game/turn` e o formato raw de `/metrics` para que o Frontend React e o Backend FastAPI tenham alinhamento total de tipos desde o início.
-2. **[behavior.feature](file:///opt/aula/rpg-texto-agentes-ia/docs/behavior.feature)**:
+2. **behavior.feature**:
    Especificação de cenários de teste de comportamento cobrindo turnos felizes, variação de pontos de vida por danos e uso de poções, e o fluxo crítico de resiliência e fallback caso o DeepSeek falhe ou demore mais de 4 segundos.
-3. **[crew_architecture.md](file:///opt/aula/rpg-texto-agentes-ia/docs/crew_architecture.md)**:
-   Explicação textual de como a CrewAI será estruturada, incluindo o perfil dos dois agentes principais (Mestre e NPC), as três tarefas executadas em série (Arbitragem, Diálogo, Consolidação) e como a memória de turnos recentes é injetada nas requisições da LLM.
-4. **[telemetry_dashboard.md](file:///opt/aula/rpg-texto-agentes-ia/docs/telemetry_dashboard.md)**:
+3. **langchain_architecture.md**:
+   Explicação textual de como a pipeline LangChain é estruturada, incluindo o perfil dos dois papéis principais (Mestre e NPC), as três tarefas executadas em série (Arbitragem, Diálogo, Consolidação) e como a memória de turnos recentes é injetada nas requisições da LLM.
+4. **telemetry_dashboard.md**:
    Mapeamento PromQL completo e arquivo JSON do painel Grafana contendo as visualizações de latência do DeepSeek, pizza de distribuição por modelo (DeepSeek vs Fallback), Gauge de saúde do jogador ativo e gráfico de barras empilhadas para consumo de tokens.
-5. **[prometheus.yml](file:///opt/aula/rpg-texto-agentes-ia/prometheus.yml)**:
+5. **prometheus.yml**:
    Arquivo pronto para inicializar o Prometheus raspando o backend local na porta `8000` a cada 5 segundos para telemetria de alta frequência do jogo.
 
 ---
@@ -147,11 +147,11 @@ Para oferecer uma experiência de RPG de texto de ponta, implementamos as seguin
 
 1. **Seleção de Ambientes e Transições Geográficas Dinâmicas**:
    * O jogador pode escolher começar a aventura em um dos **9 ambientes** diferentes na tela de criação de personagem (`Masmorra`, `Floresta`, `Cidade`, `Deserto`, `Montanha`, `Pântano`, `Oceano`, `Vulcão`, `Céu`).
-   * A IA da Crew é contextualizada com o ambiente ativo em cada turno. Se a ação descrita pelo jogador indicar um deslocamento lógico (ex: entrar em cavernas arcanas em uma floresta), a IA realiza dinamicamente a transição física do ambiente, atualizando o banner e os efeitos de luz no frontend.
+   * A IA do LangChain é contextualizada com o ambiente ativo em cada turno. Se a ação descrita pelo jogador indicar um deslocamento lógico (ex: entrar em cavernas arcanas em uma floresta), a IA realiza dinamicamente a transição física do ambiente, atualizando o banner e os efeitos de luz no frontend.
 2. **Alternativas de Ação (Sugestões da IA)**:
    * Switch opcional na criação do personagem para que o Mestre (Game Master) forneça de 3 a 5 alternativas rápidas de ação clicáveis e contextuais para o próximo turno. O jogador pode optar por clicar em um botão ou ignorá-los e descrever sua ação livremente na caixa de entrada.
 3. **Narrativa Curta e Dinâmica**:
-   * Switch opcional para forçar a CrewAI a gerar respostas e diálogos mais compactos, ágeis e diretos, economizando tempo de leitura e tokens.
+   * Switch opcional para forçar a pipeline LangChain a gerar respostas e diálogos mais compactos, ágeis e diretos, economizando tempo de leitura e tokens.
 4. **Inventário Agrupado com Quantidades e Pluralização Dinâmica**:
    * O backend extrai quantidades de textos como `"15 Moedas de Ouro"` e gerencia o inventário armazenando os itens individualmente na mochila do jogador.
    * O frontend agrupa itens idênticos com multiplicadores e aplica a pluralização correta de exibição (ex: `"Moeda de Ouro"` para 1 unidade e `"Moedas de Ouro"` para mais de 1). Consumos parciais deduzem a quantidade exata do inventário do jogador.
@@ -178,4 +178,3 @@ python3 import_dashboard.py
 ```
 
 O script criará a fonte de dados `Prometheus` (conectando ao container correspondente) e importará o painel exibindo o link de acesso direto do dashboard.
-

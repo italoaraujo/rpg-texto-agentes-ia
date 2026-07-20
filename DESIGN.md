@@ -69,7 +69,7 @@ A interface responde de forma orgânica às interações do usuário, criando um
 * **Barra de Vida Corporal**:
   * A barra transiciona sua cor dinamicamente: verde (saúde >= 70%), amarelo/dourado (saúde >= 30%) e vermelho (perigo abaixo de 30%).
 * **Indicador de Digitação (Typing Indicator)**:
-  * Três bolhas com animação oscilante de pulso em loop de 1.4s que avisam o jogador quando os agentes da CrewAI estão processando o turno no backend.
+  * Três bolhas com animação oscilante de pulso em loop de 1.4s que avisam o jogador quando os agentes do LangChain estão processando o turno no backend.
 * **Conexão Ativa**:
   * O crachá "Mestre Online" pisca uma bolha de status verde neon simulando batimentos cardíacos para assegurar que a conexão via WebSocket/Polling com o backend FastAPI está saudável.
 

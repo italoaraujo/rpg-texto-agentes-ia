@@ -133,7 +133,7 @@ def detect_state_changes(prev: dict, curr: dict, timestamp: float) -> list:
 
 app = FastAPI(
     title="RPG de Texto Baseado em Agentes - API",
-    description="Backend para processamento de RPG de texto com CrewAI e DeepSeek"
+    description="Backend para processamento de RPG de texto com LangChain e DeepSeek"
 )
 
 # Configuração do Middleware CORS para permitir conexão com o Frontend
@@ -177,7 +177,7 @@ def start_game(request: StartGameRequest):
     initial_inventory = get_initial_inventory(request.character_class)
     initial_skills = get_initial_skills(request.character_class)
     
-    # Para o turno de introdução, orquestramos a Crew interpretando a ação inicial do jogador
+    # Para o turno de introdução, orquestramos a pipeline LangChain interpretando a ação inicial do jogador
     intro_action = f"Explorar a região de {request.starting_environment} e observar o ambiente ao redor."
     
     initial_companions = []

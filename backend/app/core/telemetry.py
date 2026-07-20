@@ -36,10 +36,10 @@ rpg_llm_tokens_consumed_total = Counter(
     registry=REGISTRY
 )
 
-# 5. Histogram para Duração das Tarefas da Crew
+# 5. Histogram para Duração das Tarefas da Pipeline LangChain
 rpg_crew_task_duration_seconds = Histogram(
     "rpg_crew_task_duration_seconds",
-    "Duração de execução de cada tarefa individual na CrewAI",
+    "Duração de execução de cada tarefa individual na pipeline LangChain",
     labelnames=["task_name"],
     buckets=(0.1, 0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0, float("inf")),
     registry=REGISTRY

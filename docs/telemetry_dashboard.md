@@ -12,9 +12,9 @@ O backend FastAPI irá expor no endpoint `/metrics` as seguintes métricas nativ
 | :--- | :--- | :--- | :--- |
 | `rpg_player_health` | **Gauge** | `game_id`, `player_name`, `character_class` | Nível atual de pontos de vida do jogador. |
 | `rpg_model_switches_total` | **Counter** | `reason`, `fallback_model` | Total de vezes que a aplicação alternou de modelo de IA (fallback). |
-| `rpg_llm_request_duration_seconds` | **Histogram** | `model`, `status` | Tempo de resposta (latência) da chamada de IA da Crew. |
-| `rpg_llm_tokens_consumed_total` | **Counter** | `model`, `type` (`prompt` ou `completion`) | Contagem total de tokens consumidos no processamento. |
-| `rpg_crew_task_duration_seconds` | **Histogram** | `task_name` | Duração de execução de cada tarefa individual na CrewAI (arbitration, npc_reaction, consolidation). |
+| `rpg_llm_request_duration_seconds` | **Histogram** | `model`, `status` | Tempo de resposta (latência) da chamada de IA do LangChain. |
+| `rpg_llm_tokens_consumed_total` | **Counter** | `model`, `type` | Consumo acumulado de tokens (prompt vs completion). |
+| `rpg_crew_task_duration_seconds` | **Histogram** | `task_name` | Duração de execução de cada tarefa individual na pipeline LangChain (arbitration, npc_reaction, consolidation). |
 | `rpg_active_environment_turns_total` | **Counter** | `biome` | Contador de turnos passados em cada ambiente. |
 | `rpg_game_turns_total` | **Counter** | `game_id` | Contador total de turnos processados por sessão. |
 | `rpg_active_sessions_count` | **Gauge** | nenhuma | Quantidade de sessões de jogos ativas simultaneamente. |
@@ -60,7 +60,7 @@ Aqui estão as queries PromQL detalhadas para alimentar cada um dos painéis no 
   (sum(increase(rpg_llm_tokens_consumed_total{model="deepseek-chat", type="prompt"}[24h])) * 0.00000014) + (sum(increase(rpg_llm_tokens_consumed_total{model="deepseek-chat", type="completion"}[24h])) * 0.00000028) + (sum(increase(rpg_llm_tokens_consumed_total{model="gpt-4o-mini", type="prompt"}[24h])) * 0.00000015) + (sum(increase(rpg_llm_tokens_consumed_total{model="gpt-4o-mini", type="completion"}[24h])) * 0.00000060)
   ```
 
-### F. Duração Média das Tarefas da Crew (Gráfico de Linha / Time Series)
+### F. Duração Média das Tarefas da Pipeline LangChain (Gráfico de Linha / Time Series)
 * Query PromQL:
   ```promql
   sum(rate(rpg_crew_task_duration_seconds_sum[5m])) by (task_name) / sum(rate(rpg_crew_task_duration_seconds_count[5m])) by (task_name)
@@ -246,7 +246,7 @@ Abaixo está o arquivo JSON completo estruturado com os 9 painéis integrados e 
     },
     {
       "id": 6,
-      "title": "Duração Média das Tarefas da Crew",
+      "title": "Duração Média das Tarefas da Pipeline LangChain",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
       "targets": [
@@ -335,7 +335,7 @@ Abaixo está o arquivo JSON completo estruturado com os 9 painéis integrados e 
   ],
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["rpg", "crewai", "deepseek"],
+  "tags": ["rpg", "langchain", "deepseek"],
   "time": {
     "from": "now-1h",
     "to": "now"

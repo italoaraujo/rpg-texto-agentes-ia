@@ -450,7 +450,7 @@ export default function App() {
       <div className="app-container">
         <div className="glass-panel setup-screen">
           <h1 className="setup-title">Crônicas dos Agentes</h1>
-          <p className="setup-subtitle">Construa sua lenda no RPG de agentes com DeepSeek & CrewAI</p>
+          <p className="setup-subtitle">Construa sua lenda no RPG de agentes com DeepSeek & LangChain</p>
           
           {connectionError && (
             <div style={{
@@ -692,7 +692,7 @@ export default function App() {
                       Narrativa Curta e Dinâmica
                     </label>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      A Crew responderá com diálogos e ações físicas mais ágeis e diretas.
+                      Os agentes responderão com diálogos e ações físicas mais ágeis e diretas.
                     </span>
                   </div>
                 </div>
@@ -848,7 +848,7 @@ export default function App() {
                   {loading ? (
                     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
                       <div className="spinner"></div>
-                      Invocando a Crew...
+                      Invocando os Agentes...
                     </div>
                   ) : 'Iniciar Aventura'}
                 </button>
@@ -989,7 +989,7 @@ export default function App() {
                       alignItems: 'center',
                       gap: '6px'
                     }}>
-                      <span>📜 Resolvido pela Crew:</span>
+                      <span>📜 Resolvido pelos Agentes:</span>
                     </div>
                     <p className="narrative-text">{block.text}</p>
                   </div>

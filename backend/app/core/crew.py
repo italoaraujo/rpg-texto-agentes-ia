@@ -2,16 +2,17 @@ import time
 import json
 import re
 from uuid import UUID
-from typing import List, Dict, Any, Tuple
-from crewai import Crew, Process
+from typing import List, Dict, Any, Tuple, Optional
+
 from langchain_community.callbacks import get_openai_callback
+from langchain_openai import ChatOpenAI
 
 from app.config import settings
-from app.core.agents import get_llm, create_game_master_agent, create_npc_agent
+from app.core.agents import get_llm
 from app.core.tasks import (
-    create_arbitration_task,
-    create_npc_reaction_task,
-    create_consolidation_task
+    create_arbitration_messages,
+    create_npc_reaction_messages,
+    create_consolidation_messages
 )
 from app.core.telemetry import (
     rpg_player_health,
@@ -27,12 +28,10 @@ from app.core.telemetry import (
 def clean_json_output(output_str: str) -> Dict[str, Any]:
     """Extrai e limpa a resposta JSON da LLM, tratando marcações markdown de forma altamente resiliente."""
     try:
-        # Se a saída estiver embrulhada em blocos de código markdown ```json ... ```
         match = re.search(r"```json\s*(.*?)\s*```", output_str, re.DOTALL)
         if match:
             json_str = match.group(1)
         else:
-            # Caso contrário, tenta encontrar a abertura e fechamento de chaves
             match_braces = re.search(r"(\{.*?\})", output_str, re.DOTALL)
             json_str = match_braces.group(1) if match_braces else output_str
         
@@ -40,19 +39,14 @@ def clean_json_output(output_str: str) -> Dict[str, Any]:
     except Exception as e:
         print(f"[ERROR] Falha ao parsear JSON da narrativa: {e}. String bruta: {output_str}")
         
-        # Fallback resiliente usando regex para tentar extrair campos chave do JSON incompleto/inválido
         narrative = ""
-        # Procura por "narrative": "..." tratando aspas escapadas
         match_narrative = re.search(r'"narrative"\s*:\s*"((?:[^"\\]|\\.)*)"', output_str, re.DOTALL)
         if match_narrative:
-            # Desescapa aspas e quebras de linha para exibição limpa
             narrative = match_narrative.group(1).replace('\\"', '"').replace('\\n', '\n')
         else:
-            # Se parecer um JSON quebrado mas não capturou narrative, fornece um feedback amigável
             if "{" in output_str or '"narrative"' in output_str:
                 narrative = "Ocorreu um tremor místico e a visão se dissipou... (Erro na formatação da narrativa)."
             else:
-                # Se não tem indícios de JSON, assume que a LLM respondeu com texto puro direto
                 narrative = output_str
 
         health_change = 0
@@ -60,7 +54,6 @@ def clean_json_output(output_str: str) -> Dict[str, Any]:
         if match_health:
             health_change = int(match_health.group(1))
 
-        # Tenta pegar o current_environment via regex
         current_env = "Masmorra"
         match_env = re.search(r'"current_environment"\s*:\s*"([^"]+)"', output_str)
         if match_env:
@@ -106,6 +99,71 @@ def parse_item_and_qty(item_str: str) -> Tuple[str, int]:
         
     return name, qty
 
+
+def execute_langchain_pipeline(
+    llm: ChatOpenAI,
+    player_action: str,
+    current_health: int,
+    current_inventory: List[str],
+    current_companions: List[str],
+    current_skills: List[str],
+    character_class: str,
+    short_narrative: bool,
+    suggest_actions: bool,
+    current_environment: str,
+    history: Optional[List[Dict[str, str]]]
+) -> str:
+    """Executa a sequência de 3 passos do LangChain (Arbitragem -> Reação NPC -> Consolidação JSON)."""
+    active_companion = current_companions[0] if current_companions else None
+
+    # Tarefa 1: Arbitragem Físico-Mecânica (Game Master)
+    t1_start = time.time()
+    messages1 = create_arbitration_messages(
+        player_action=player_action,
+        health=current_health,
+        inventory=current_inventory,
+        companions=current_companions,
+        skills=current_skills,
+        class_name=character_class,
+        short_narrative=short_narrative,
+        current_environment=current_environment,
+        history=history
+    )
+    res1 = llm.invoke(messages1)
+    arbitration_output = res1.content if hasattr(res1, "content") else str(res1)
+    dur1 = time.time() - t1_start
+    rpg_crew_task_duration_seconds.labels(task_name="arbitration").observe(dur1)
+
+    # Tarefa 2: Reação do NPC ou Eco do Ambiente
+    t2_start = time.time()
+    messages2 = create_npc_reaction_messages(
+        arbitration_output=arbitration_output,
+        companion_name=active_companion,
+        short_narrative=short_narrative
+    )
+    res2 = llm.invoke(messages2)
+    npc_output = res2.content if hasattr(res2, "content") else str(res2)
+    dur2 = time.time() - t2_start
+    rpg_crew_task_duration_seconds.labels(task_name="npc_reaction").observe(dur2)
+
+    # Tarefa 3: Consolidação e Formatação JSON (Game Master)
+    t3_start = time.time()
+    messages3 = create_consolidation_messages(
+        arbitration_output=arbitration_output,
+        npc_reaction_output=npc_output,
+        skills=current_skills,
+        short_narrative=short_narrative,
+        suggest_actions=suggest_actions,
+        current_environment=current_environment
+    )
+    res3 = llm.invoke(messages3)
+    consolidation_output = res3.content if hasattr(res3, "content") else str(res3)
+    dur3 = time.time() - t3_start
+    rpg_crew_task_duration_seconds.labels(task_name="consolidation").observe(dur3)
+
+    return consolidation_output
+
+
 def run_game_turn(
     game_id: UUID,
     player_name: str,
@@ -121,7 +179,7 @@ def run_game_turn(
     history: List[Dict[str, str]] = None
 ) -> Tuple[str, str, List[str], Dict[str, Any], Dict[str, Any]]:
     """
-    Orquestra o turno usando CrewAI.
+    Orquestra o turno usando LangChain.
     Tenta primeiro usar o DeepSeek. Se demorar mais de 4s ou falhar, alterna para GPT-4o-Mini.
     Retorna (narrativa_final, ambiente_geografico, sugestoes_de_acao, estado_jogador_atualizado, telemetria_metadata).
     """
@@ -129,36 +187,12 @@ def run_game_turn(
     fallback_triggered = False
     response_time = 0.0
     tokens = {"prompt": 0, "completion": 0, "total": 0}
-    crew_output = ""
+    pipeline_output = ""
 
     start_time = time.time()
-    crew_start_time = start_time
-    t1_end = None
-    t2_end = None
-
-    def t1_callback(output):
-        nonlocal t1_end
-        t1_end = time.time()
-        dur = t1_end - crew_start_time
-        rpg_crew_task_duration_seconds.labels(task_name="arbitration").observe(dur)
-
-    def t2_callback(output):
-        nonlocal t1_end, t2_end
-        t2_end = time.time()
-        start = t1_end if t1_end else crew_start_time
-        dur = t2_end - start
-        rpg_crew_task_duration_seconds.labels(task_name="npc_reaction").observe(dur)
-
-    def t3_callback(output):
-        nonlocal t2_end
-        t3_end = time.time()
-        start = t2_end if t2_end else crew_start_time
-        dur = t3_end - start
-        rpg_crew_task_duration_seconds.labels(task_name="consolidation").observe(dur)
 
     try:
-        print(f"[INFO] Iniciando turno do jogo {game_id} usando {active_model} (narrativa_curta={short_narrative}, sugerir_acoes={suggest_actions}, ambiente={current_environment})...")
-        # 1. Instancia LLM Primária (DeepSeek) com timeout estrito de 4s
+        print(f"[INFO] Iniciando turno do jogo {game_id} via LangChain usando {active_model} (narrativa_curta={short_narrative}, sugerir_acoes={suggest_actions}, ambiente={current_environment})...")
         max_tokens = 1500 if short_narrative else 2500
         llm = get_llm(
             model_name=settings.PRIMARY_MODEL,
@@ -166,64 +200,49 @@ def run_game_turn(
             max_tokens=max_tokens
         )
         
-        # 2. Cria agentes e tarefas
-        active_companion = current_companions[0] if current_companions else None
-        gm_agent = create_game_master_agent(llm)
-        npc_agent = create_npc_agent(llm, active_companion)
-        
-        t1 = create_arbitration_task(gm_agent, player_action, current_health, current_inventory, current_companions, current_skills, character_class, short_narrative, current_environment, history=history, callback=t1_callback)
-        t2 = create_npc_reaction_task(npc_agent, t1, active_companion, short_narrative, callback=t2_callback)
-        t3 = create_consolidation_task(gm_agent, t1, t2, current_skills, short_narrative, suggest_actions, current_environment, callback=t3_callback)
-        
-        crew = Crew(
-            agents=[gm_agent, npc_agent],
-            tasks=[t1, t2, t3],
-            process=Process.sequential,
-            verbose=True
-        )
-        
-        # 3. Executa capturando tokens
         with get_openai_callback() as cb:
-            crew_output = crew.kickoff()
+            pipeline_output = execute_langchain_pipeline(
+                llm=llm,
+                player_action=player_action,
+                current_health=current_health,
+                current_inventory=current_inventory,
+                current_companions=current_companions,
+                current_skills=current_skills,
+                character_class=character_class,
+                short_narrative=short_narrative,
+                suggest_actions=suggest_actions,
+                current_environment=current_environment,
+                history=history
+            )
             tokens["prompt"] = cb.prompt_tokens
             tokens["completion"] = cb.completion_tokens
             tokens["total"] = cb.total_tokens
             
-        # Estimador lógico de fallback se a API do DeepSeek ou o Callback retornar 0
         if tokens["total"] == 0:
             est_prompt = max(800, (len(player_action) + 3000) // 3)
-            est_completion = max(100, len(str(crew_output)) // 3)
+            est_completion = max(100, len(str(pipeline_output)) // 3)
             tokens["prompt"] = est_prompt
             tokens["completion"] = est_completion
             tokens["total"] = est_prompt + est_completion
         
         response_time = time.time() - start_time
-        # Registra a latência feliz do DeepSeek
         rpg_llm_request_duration_seconds.labels(model=settings.PRIMARY_MODEL, status="success").observe(response_time)
         
     except Exception as exc:
-        # Se falhou ou deu timeout (> 4s), entra no bloco de fallback
         response_time = time.time() - start_time
         print(f"[WARNING] API Primária ({settings.PRIMARY_MODEL}) falhou ou estourou timeout em {response_time:.2f}s. Erro: {exc}")
         
-        # Registra a falha na latência do DeepSeek
         rpg_llm_request_duration_seconds.labels(model=settings.PRIMARY_MODEL, status="failure").observe(response_time)
         
-        # Incrementa contador de fallbacks
         reason = "timeout" if response_time >= settings.DEEPSEEK_TIMEOUT else "api_error"
         rpg_model_switches_total.labels(reason=reason, fallback_model=settings.FALLBACK_MODEL).inc()
         
-        # Dispara fallback
         fallback_triggered = True
         active_model = settings.FALLBACK_MODEL
-        print(f"[INFO] Acionando modelo reserva {active_model}...")
+        print(f"[INFO] Acionando modelo reserva {active_model} via LangChain...")
         
         fallback_start_time = time.time()
-        crew_start_time = fallback_start_time
-        t1_end = None
-        t2_end = None
         try:
-            # Instancia LLM de fallback com timeout maior
             max_tokens_fallback = 1500 if short_narrative else 2500
             llm_fallback = get_llm(
                 model_name=settings.FALLBACK_MODEL,
@@ -231,63 +250,56 @@ def run_game_turn(
                 max_tokens=max_tokens_fallback
             )
             
-            active_companion = current_companions[0] if current_companions else None
-            gm_agent = create_game_master_agent(llm_fallback)
-            npc_agent = create_npc_agent(llm_fallback, active_companion)
-            
-            t1 = create_arbitration_task(gm_agent, player_action, current_health, current_inventory, current_companions, current_skills, character_class, short_narrative, current_environment, history=history, callback=t1_callback)
-            t2 = create_npc_reaction_task(npc_agent, t1, active_companion, short_narrative, callback=t2_callback)
-            t3 = create_consolidation_task(gm_agent, t1, t2, current_skills, short_narrative, suggest_actions, current_environment, callback=t3_callback)
-            
-            crew_fallback = Crew(
-                agents=[gm_agent, npc_agent],
-                tasks=[t1, t2, t3],
-                process=Process.sequential,
-                verbose=True
-            )
-            
             with get_openai_callback() as cb:
-                crew_output = crew_fallback.kickoff()
+                pipeline_output = execute_langchain_pipeline(
+                    llm=llm_fallback,
+                    player_action=player_action,
+                    current_health=current_health,
+                    current_inventory=current_inventory,
+                    current_companions=current_companions,
+                    current_skills=current_skills,
+                    character_class=character_class,
+                    short_narrative=short_narrative,
+                    suggest_actions=suggest_actions,
+                    current_environment=current_environment,
+                    history=history
+                )
                 tokens["prompt"] = cb.prompt_tokens
                 tokens["completion"] = cb.completion_tokens
                 tokens["total"] = cb.total_tokens
                 
-            # Estimador lógico de fallback para a chamada de contingência
             if tokens["total"] == 0:
                 est_prompt = max(800, (len(player_action) + 3000) // 3)
-                est_completion = max(100, len(str(crew_output)) // 3)
+                est_completion = max(100, len(str(pipeline_output)) // 3)
                 tokens["prompt"] = est_prompt
                 tokens["completion"] = est_completion
                 tokens["total"] = est_prompt + est_completion
                 
-            response_time = time.time() - start_time  # tempo total desde o início da requisição
+            response_time = time.time() - start_time
             fallback_duration = time.time() - fallback_start_time
             
-            # Registra sucesso da LLM de fallback
             rpg_llm_request_duration_seconds.labels(model=settings.FALLBACK_MODEL, status="success").observe(fallback_duration)
             
         except Exception as fallback_exc:
             print(f"[CRITICAL] API de Fallback também falhou: {fallback_exc}")
             raise fallback_exc
- 
-    # 4. Registra tokens consumidos no Prometheus
+
+    # Registra tokens consumidos no Prometheus
     rpg_llm_tokens_consumed_total.labels(model=active_model, type="prompt").inc(tokens["prompt"])
     rpg_llm_tokens_consumed_total.labels(model=active_model, type="completion").inc(tokens["completion"])
- 
-    # 5. Processa a resposta estruturada
-    resolved_data = clean_json_output(crew_output)
+
+    # Processa a resposta estruturada JSON
+    resolved_data = clean_json_output(pipeline_output)
     
-    # Extrai o ambiente de destino e valida se ele é suportado
     updated_env = resolved_data.get("current_environment", current_environment)
     if updated_env not in ["Masmorra", "Floresta", "Cidade", "Deserto", "Montanha", "Pantano", "Oceano", "Vulcao", "Ceu"]:
         updated_env = current_environment
     
-    # Extrai sugestões de ações alternativas do JSON
     suggested_actions = resolved_data.get("suggested_actions", [])
     if not isinstance(suggested_actions, list):
         suggested_actions = []
     
-    # 6. Atualiza o estado lógico do jogador
+    # Atualiza o estado lógico do jogador
     health_change = resolved_data.get("health_change", 0)
     new_health = max(0, min(100, current_health + health_change))
     
@@ -304,13 +316,11 @@ def run_game_turn(
             norm_name = normalize_item_name(name)
             match_item = None
             
-            # 1. Tenta correspondência exata normalizada (sem acentos, caixa baixa)
             for inv_item in updated_inventory:
                 if normalize_item_name(inv_item) == norm_name:
                     match_item = inv_item
                     break
                     
-            # 2. Se não encontrou, tenta correspondência parcial (ex: "pocao de cura" contido em "pocao de cura p")
             if not match_item:
                 for inv_item in updated_inventory:
                     norm_inv_item = normalize_item_name(inv_item)
@@ -323,24 +333,21 @@ def run_game_turn(
                 rpg_player_items_consumed_total.labels(item_name=match_item).inc()
             else:
                 print(f"[WARNING] Item '{name}' solicitado para remoção não foi encontrado no inventário: {updated_inventory}")
- 
-    # 7. Atualiza o Gauge de vida no Prometheus
+
+    # Atualiza métricas Prometheus
     rpg_player_health.labels(
         game_id=str(game_id),
         player_name=player_name,
         character_class=character_class
     ).set(new_health)
 
-    # 8. Incrementa o contador de turnos e turnos por ambiente
     rpg_game_turns_total.labels(game_id=str(game_id)).inc()
     rpg_active_environment_turns_total.labels(biome=updated_env).inc()
- 
-    # Extrai a lista de companheiros ativa do retorno JSON
+
     updated_companions = resolved_data.get("companions", current_companions)
     if not isinstance(updated_companions, list):
         updated_companions = current_companions
 
-    # Extrai a lista de habilidades ativa do retorno JSON
     updated_skills = resolved_data.get("skills", current_skills)
     if not isinstance(updated_skills, list):
         updated_skills = current_skills
@@ -353,12 +360,12 @@ def run_game_turn(
         "skills": updated_skills,
         "alive": new_health > 0
     }
- 
+
     telemetry_metadata = {
         "active_model": active_model,
         "fallback_triggered": fallback_triggered,
         "response_time_seconds": round(response_time, 2),
         "tokens_consumed": tokens
     }
- 
+
     return resolved_data.get("narrative", ""), updated_env, suggested_actions, player_state, telemetry_metadata
